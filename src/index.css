@@ -1,0 +1,86 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* Trading Theme - Professional Dark */
+    --background: 220 15% 6%;
+    --foreground: 210 40% 98%;
+
+    --card: 220 15% 8%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 220 15% 8%;
+    --popover-foreground: 210 40% 98%;
+
+    /* AI Trading Blue */
+    --primary: 217 91% 60%;
+    --primary-foreground: 220 15% 6%;
+    --primary-glow: 217 91% 70%;
+
+    /* Trading Success Green */
+    --success: 142 76% 36%;
+    --success-foreground: 210 40% 98%;
+    --success-glow: 142 76% 46%;
+
+    /* Trading Danger Red */
+    --danger: 0 84% 60%;
+    --danger-foreground: 210 40% 98%;
+    --danger-glow: 0 84% 70%;
+
+    /* Warning Yellow */
+    --warning: 48 96% 53%;
+    --warning-foreground: 220 15% 6%;
+    --warning-glow: 48 96% 63%;
+
+    --secondary: 220 15% 12%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 220 15% 10%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 220 15% 14%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 220 15% 16%;
+    --input: 220 15% 12%;
+    --ring: 217 91% 60%;
+
+    --radius: 0.75rem;
+
+    /* Trading Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
+    --gradient-success: linear-gradient(135deg, hsl(var(--success)), hsl(var(--success-glow)));
+    --gradient-danger: linear-gradient(135deg, hsl(var(--danger)), hsl(var(--danger-glow)));
+    --gradient-hero: linear-gradient(135deg, hsl(217 91% 60% / 0.9), hsl(142 76% 36% / 0.8));
+    --gradient-dark: linear-gradient(180deg, hsl(220 15% 8%), hsl(220 15% 4%));
+
+    /* Trading Shadows */
+    --shadow-primary: 0 0 40px hsl(var(--primary) / 0.3);
+    --shadow-success: 0 0 30px hsl(var(--success) / 0.3);
+    --shadow-danger: 0 0 30px hsl(var(--danger) / 0.3);
+    --shadow-glow: 0 10px 40px -10px hsl(var(--primary) / 0.4);
+
+    /* Animations */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-spring: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
