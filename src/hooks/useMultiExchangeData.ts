@@ -82,6 +82,7 @@ export const useMultiExchangeData = (exchange: string = 'binance', pair: string 
   useEffect(() => {
     const fetchHistoricalData = async () => {
       try {
+        console.log('🔍 useMultiExchangeData: Iniciando busca de dados', { exchange, pair, interval });
         setLoading(true);
         
         if (exchange === 'binance') {
@@ -119,10 +120,18 @@ export const useMultiExchangeData = (exchange: string = 'binance', pair: string 
 
   const fetchBinanceData = async () => {
     const symbol = EXCHANGE_PAIRS.binance[pair as keyof typeof EXCHANGE_PAIRS.binance];
-    if (!symbol) return;
+    console.log('🔍 fetchBinanceData: Symbol mapeado', { pair, symbol });
+    if (!symbol) {
+      console.error('❌ fetchBinanceData: Symbol não encontrado para o par', pair);
+      return;
+    }
 
-    const response = await fetch(`${EXCHANGE_APIS.binance.rest}?symbol=${symbol}&interval=${interval}&limit=500`);
+    const url = `${EXCHANGE_APIS.binance.rest}?symbol=${symbol}&interval=${interval}&limit=500`;
+    console.log('🔍 fetchBinanceData: URL da API', url);
+    
+    const response = await fetch(url);
     const data = await response.json();
+    console.log('🔍 fetchBinanceData: Dados recebidos', { dataLength: data.length, firstCandle: data[0] });
     
     const candleData = data.map((kline: any[]) => ({
       time: kline[0],
@@ -133,6 +142,7 @@ export const useMultiExchangeData = (exchange: string = 'binance', pair: string 
       volume: parseFloat(kline[5])
     }));
     
+    console.log('🔍 fetchBinanceData: Candles processados', { candleCount: candleData.length });
     setCandles(candleData);
     
     if (candleData.length > 0) {
@@ -153,14 +163,16 @@ export const useMultiExchangeData = (exchange: string = 'binance', pair: string 
         formattedVolume = volume.toFixed(0);
       }
       
-      setLiveData({
+      const liveDataObj = {
         symbol: pair,
         price: lastCandle.close.toFixed(2),
         change: `${change.startsWith('-') ? '' : '+'}${change}%`,
         volume: formattedVolume,
         timestamp: Date.now(),
         exchange: 'Binance'
-      });
+      };
+      console.log('🔍 fetchBinanceData: LiveData definido', liveDataObj);
+      setLiveData(liveDataObj);
     }
   };
 

@@ -32,9 +32,16 @@ export interface PatternDetection {
 
 export const usePatternDetection = (candles: Candle[]) => {
   return useMemo(() => {
-    if (candles.length < 50) return null;
+    console.log('🔍 usePatternDetection: Candles recebidos', { candleCount: candles?.length });
     
-    return detectPatterns(candles);
+    if (!candles || candles.length < 20) {
+      console.log('⚠️ usePatternDetection: Dados insuficientes', { candleCount: candles?.length });
+      return null; // Reduzido de 50 para 20
+    }
+    
+    const patterns = detectPatterns(candles);
+    console.log('✅ usePatternDetection: Padrões detectados', patterns);
+    return patterns;
   }, [candles]);
 };
 

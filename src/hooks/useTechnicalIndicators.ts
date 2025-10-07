@@ -40,9 +40,16 @@ export interface TechnicalIndicators {
 
 export const useTechnicalIndicators = (candles: Candle[]) => {
   return useMemo(() => {
-    if (candles.length < 200) return null; // Precisa de dados suficientes
+    console.log('🔍 useTechnicalIndicators: Candles recebidos', { candleCount: candles?.length });
     
-    return calculateIndicators(candles);
+    if (!candles || candles.length < 50) {
+      console.log('⚠️ useTechnicalIndicators: Dados insuficientes', { candleCount: candles?.length });
+      return null; // Reduzido de 200 para 50 para funcionar com menos dados
+    }
+    
+    const indicators = calculateIndicators(candles);
+    console.log('✅ useTechnicalIndicators: Indicadores calculados', indicators);
+    return indicators;
   }, [candles]);
 };
 

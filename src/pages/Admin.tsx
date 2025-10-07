@@ -14,16 +14,37 @@ import { AdminAnalytics } from '@/components/admin/AdminAnalytics';
 import { AdminBuilder } from '@/components/admin/AdminBuilder';
 import { IntegratedThreeChats } from '@/components/admin/IntegratedThreeChats';
 import { RealLearningSystem } from '@/components/admin/RealLearningSystem';
+import { AgentAnalysis } from '@/components/admin/AgentAnalysis';
+import { useMultiExchangeData } from '@/hooks/useMultiExchangeData';
+import { useTechnicalIndicators } from '@/hooks/useTechnicalIndicators';
+import { usePatternDetection } from '@/hooks/usePatternDetection';
 import { Loader2 } from 'lucide-react';
 
 const Admin = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [activeView, setActiveView] = useState<'dashboard' | 'chat' | 'knowledge' | 'analytics' | 'builder' | 'threechats' | 'learning'>('dashboard');
+  const [adminLoading, setAdminLoading] = useState(true);
+  const [activeView, setActiveView] = useState<'dashboard' | 'chat' | 'knowledge' | 'analytics' | 'builder' | 'threechats' | 'learning' | 'agentanalysis'>('dashboard');
   const [isChatsSidebarOpen, setIsChatsSidebarOpen] = useState(false);
   const [selectedSymbol, setSelectedSymbol] = useState('BTC/USDT');
+  const [selectedTimeframe, setSelectedTimeframe] = useState('3m');
+
+  // Dados de mercado para compartilhar entre componentes
+  const { liveData, candles, loading } = useMultiExchangeData('binance', selectedSymbol, selectedTimeframe);
+  
+  // Formatar candles para os hooks
+  const formattedCandles = candles?.map(c => ({
+    open: c.open,
+    high: c.high,
+    low: c.low,
+    close: c.close,
+    volume: c.volume,
+    timestamp: c.time
+  })) || [];
+  
+  const technicalIndicators = useTechnicalIndicators(formattedCandles);
+  const patterns = usePatternDetection(formattedCandles);
 
   useEffect(() => {
     const checkAdminStatus = async () => {
@@ -58,14 +79,14 @@ const Admin = () => {
         console.error('Error:', error);
         navigate('/');
       } finally {
-        setLoading(false);
+        setAdminLoading(false);
       }
     };
 
     checkAdminStatus();
   }, [user, navigate]);
 
-  if (loading) {
+  if (adminLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-dark">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -97,6 +118,15 @@ const Admin = () => {
           <main className="flex-1 overflow-auto p-6">
             {activeView === 'dashboard' && <AdminDashboard />}
             {activeView === 'chat' && <AdminChat />}
+            {activeView === 'agentanalysis' && (
+              <AgentAnalysis 
+                selectedSymbol={selectedSymbol}
+                liveData={liveData}
+                candles={formattedCandles}
+                technicalIndicators={technicalIndicators}
+                patterns={patterns}
+              />
+            )}
             {activeView === 'knowledge' && <AdminKnowledge />}
             {activeView === 'analytics' && <AdminAnalytics />}
             {activeView === 'builder' && <AdminBuilder />}
