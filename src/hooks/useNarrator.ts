@@ -126,10 +126,16 @@ export const useNarrator = (
 
       // Extrair recomendação da resposta do Agente
       const response = data.response || '';
+      console.log('🤖 Resposta do Agente:', response);
+      console.log('🤖 Data completa do Agente:', data);
+      
       const isApproved = response.includes('GENERATE_SIGNAL') || 
                         response.includes('gerar sinal') || 
                         response.includes('recomendo') ||
-                        response.includes('aprovado');
+                        response.includes('aprovado') ||
+                        response.includes('RECOMENDO');
+      
+      console.log('🤖 Agente aprovou sinal?', isApproved);
       
       return {
         recommendation: isApproved ? 'GENERATE_SIGNAL' : 'WAIT',
@@ -196,6 +202,17 @@ export const useNarrator = (
       // Só prosseguir se Agente aprovar
       if (agentValidation.recommendation !== 'GENERATE_SIGNAL') {
         console.log('⏸️ Sinal descartado pelo Agente:', agentValidation.reasoning);
+        console.log('🔍 Debug - agentValidation:', agentValidation);
+        
+        // Se o Agente rejeitou, ainda assim podemos falar sobre isso
+        if (speakEnabled && enabled && isPlaying && isRunningRef.current) {
+          const utterance = new SpeechSynthesisUtterance(
+            `Sinal descartado pelo Agente TradeVision IA. ${agentValidation.reasoning}`
+          );
+          utterance.lang = 'pt-BR';
+          utterance.rate = 0.8;
+          speechSynthesis.speak(utterance);
+        }
         return;
       }
 

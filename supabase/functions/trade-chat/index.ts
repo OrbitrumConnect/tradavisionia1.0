@@ -419,6 +419,13 @@ class TradeVisionAI {
       const finalRecommendation = confidence >= 70 ? 'GENERATE_SIGNAL' : 'WAIT';
       const finalConfidence = Math.min(confidence, 95);
       
+      console.log('🧠 Decisão final do Agente:', {
+        confidence,
+        finalConfidence,
+        finalRecommendation,
+        pattern: pattern.type
+      });
+      
       const response = `🧠 ANÁLISE DO AGENTE: ${analysis}${finalRecommendation === 'GENERATE_SIGNAL' ? 'RECOMENDO: Gerar sinal com ' + finalConfidence + '% de confiança.' : 'AGUARDAR: Confiança insuficiente (' + finalConfidence + '%).'} Contexto: ${pattern.type} em ${marketData?.symbol || 'N/A'}.`;
       
       return {
