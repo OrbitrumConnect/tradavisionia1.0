@@ -12,7 +12,7 @@ import { AdminChat } from '@/components/admin/AdminChat';
 import { AdminKnowledge } from '@/components/admin/AdminKnowledge';
 import { AdminAnalytics } from '@/components/admin/AdminAnalytics';
 import { AdminBuilder } from '@/components/admin/AdminBuilder';
-import { ChatFlowView } from '@/components/admin/ChatFlowView';
+import { IntegratedThreeChats } from '@/components/admin/IntegratedThreeChats';
 import { RealLearningSystem } from '@/components/admin/RealLearningSystem';
 import { Loader2 } from 'lucide-react';
 
@@ -21,7 +21,7 @@ const Admin = () => {
   const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [activeView, setActiveView] = useState<'dashboard' | 'chat' | 'knowledge' | 'analytics' | 'builder' | 'chatflow' | 'learning'>('dashboard');
+  const [activeView, setActiveView] = useState<'dashboard' | 'chat' | 'knowledge' | 'analytics' | 'builder' | 'threechats' | 'learning'>('dashboard');
   const [isChatsSidebarOpen, setIsChatsSidebarOpen] = useState(false);
   const [selectedSymbol, setSelectedSymbol] = useState('BTC/USDT');
 
@@ -100,7 +100,7 @@ const Admin = () => {
             {activeView === 'knowledge' && <AdminKnowledge />}
             {activeView === 'analytics' && <AdminAnalytics />}
             {activeView === 'builder' && <AdminBuilder />}
-            {activeView === 'chatflow' && <ChatFlowView symbol={selectedSymbol} />}
+            {activeView === 'threechats' && <IntegratedThreeChats symbol={selectedSymbol} />}
             {activeView === 'learning' && <RealLearningSystem />}
           </main>
         </div>

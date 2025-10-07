@@ -24,6 +24,7 @@ import { PerformanceDashboard } from '@/components/analytics/PerformanceDashboar
 import { NarratorPerformance } from '@/components/analytics/NarratorPerformance';
 import { LearningProgress } from '@/components/analytics/LearningProgress';
 import { LearningDashboard } from '@/components/analytics/LearningDashboard';
+import InteractiveChart from '@/components/analytics/InteractiveChart';
 import { useTechnicalIndicators, Candle } from '@/hooks/useTechnicalIndicators';
 import { usePatternDetection } from '@/hooks/usePatternDetection';
 import { useFeatureStore } from '@/hooks/useFeatureStore';
@@ -53,6 +54,7 @@ const Dashboard = ({ onLogout, onBackToLanding }: DashboardProps) => {
   // States
   // Removido soundEnabled - usando apenas narratorEnabled
   const [narratorEnabled, setNarratorEnabled] = useState(true);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
   // Capital management states
   const [capital, setCapital] = useState('');
   const [tradeAmount, setTradeAmount] = useState('');
@@ -102,7 +104,8 @@ const Dashboard = ({ onLogout, onBackToLanding }: DashboardProps) => {
     selectedPair, 
     selectedTimeframe,
     technicalIndicators, // 🧠 Passa indicadores
-    patterns              // 🧠 Passa padrões detectados
+    patterns,            // 🧠 Passa padrões detectados
+    voiceEnabled         // 🎙️ Controle de voz
   );
 
   // Iniciar narrador automaticamente quando tudo estiver pronto
@@ -660,8 +663,7 @@ const Dashboard = ({ onLogout, onBackToLanding }: DashboardProps) => {
             </div>
             
             <div className="flex items-center gap-3">
-              {/* Removido botão Som separado - usando apenas controle do Narrador */}
-              
+              {/* Controle do Narrador */}
               <Button
                 variant="outline"
                 size="sm"
@@ -671,11 +673,34 @@ const Dashboard = ({ onLogout, onBackToLanding }: DashboardProps) => {
                 Narrador {narratorEnabled ? 'ON' : 'OFF'}
               </Button>
 
+              {/* Controle de Voz */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  // Parar voz imediatamente
+                  if (typeof speechSynthesis !== 'undefined') {
+                    speechSynthesis.cancel();
+                  }
+                  setVoiceEnabled(!voiceEnabled);
+                }}
+                disabled={!narratorEnabled}
+              >
+                <Volume2 className="h-4 w-4" />
+                Voz {voiceEnabled ? 'ON' : 'OFF'}
+              </Button>
+
               {narratorEnabled && (
                 <Button
                   variant={narrator.isPlaying ? "danger" : "default"}
                   size="sm"
-                  onClick={narrator.toggle}
+                  onClick={() => {
+                    // Se está tocando, parar voz imediatamente
+                    if (narrator.isPlaying && typeof speechSynthesis !== 'undefined') {
+                      speechSynthesis.cancel();
+                    }
+                    narrator.toggle();
+                  }}
                 >
                   {narrator.isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                   {narrator.isPlaying ? 'STOP' : 'PLAY'}
@@ -1431,6 +1456,32 @@ const Dashboard = ({ onLogout, onBackToLanding }: DashboardProps) => {
 
           {/* Right Column - Controls & Analysis - COMPACTO */}
           <div className="col-span-1 space-y-3"> {/* 1 coluna compacta */}
+            {/* Interactive Chart */}
+            <Card className="bg-card/80 border-border/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4" />
+                  Gráfico Interativo
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-3">
+                <InteractiveChart 
+                  symbol={selectedPair.replace('/', '')} 
+                  timeframe={selectedTimeframe}
+                  onDataCapture={(data) => {
+                    // Dados capturados silenciosamente para análise
+                  }}
+                  onPeriodSelect={(startTime, endTime) => {
+                    console.log('📅 Período selecionado:', { startTime, endTime });
+                    toast({
+                      title: "📅 Período Selecionado",
+                      description: `Análise de ${new Date(startTime * 1000).toLocaleString()} até ${new Date(endTime * 1000).toLocaleString()}`,
+                    });
+                  }}
+                />
+              </CardContent>
+            </Card>
+
             {/* Financial Management */}
             <Card className="bg-card/80 border-border/50">
               <CardHeader>
@@ -1779,7 +1830,7 @@ const Dashboard = ({ onLogout, onBackToLanding }: DashboardProps) => {
                       <Button 
                         variant="outline" 
                         size="sm"
-                        disabled={!narratorEnabled || narrator.feed.length === 0}
+                        disabled={!narratorEnabled || !voiceEnabled || narrator.feed.length === 0}
                         onClick={narrator.speakLatest}
                       >
                         <Volume2 className="h-4 w-4 mr-2" />

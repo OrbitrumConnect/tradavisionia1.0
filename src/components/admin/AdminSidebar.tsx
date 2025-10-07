@@ -17,7 +17,7 @@ import { SimpleChatFlow } from './SimpleChatFlow';
 
 interface AdminSidebarProps {
   activeView: string;
-  setActiveView: (view: 'dashboard' | 'chat' | 'knowledge' | 'analytics' | 'builder' | 'chatflow' | 'learning') => void;
+  setActiveView: (view: 'dashboard' | 'chat' | 'knowledge' | 'analytics' | 'builder' | 'threechats' | 'learning') => void;
   selectedSymbol?: string;
 }
 
@@ -34,7 +34,7 @@ export function AdminSidebar({ activeView, setActiveView, selectedSymbol = 'BTC/
     { id: 'knowledge', title: 'Base de Conhecimento', icon: Brain },
     { id: 'analytics', title: 'Analytics', icon: BarChart3 },
     { id: 'builder', title: 'IA Builder', icon: Wrench },
-    { id: 'chatflow', title: 'Chat Flow', icon: MessageSquare },
+    { id: 'threechats', title: 'Sistema 3 IAs', icon: Bot },
     { id: 'learning', title: 'Sistema de Aprendizado', icon: Brain },
   ];
 

@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNarratorContext } from '@/contexts/NarratorContext';
 
 export interface NarratorSignal {
+  id: string;
   symbol: string;
   timeframe: string;
   timestamp: string;
@@ -80,9 +82,11 @@ export const useNarrator = (
   selectedPair: string,
   selectedTimeframe: string,
   technicalIndicators?: any,
-  detectedPatterns?: any
+  detectedPatterns?: any,
+  speakEnabled: boolean = true
 ) => {
   const { user } = useAuth();
+  const { addNarratorSignal } = useNarratorContext();
   const [isPlaying, setIsPlaying] = useState(true);
   const [feed, setFeed] = useState<NarratorSignal[]>([]);
   
@@ -162,7 +166,7 @@ export const useNarrator = (
         console.log('⚠️ Sinal descartado pela TradeVision IA:', data.reason);
         
         // Notificar usuário sobre descarte inteligente
-        if (enabled && isPlaying) {
+        if (speakEnabled && enabled && isPlaying) {
           const utterance = new SpeechSynthesisUtterance(
             `Sinal descartado. ${data.aiValidation || 'Score abaixo do mínimo aceitável.'}`
           );
@@ -189,6 +193,7 @@ export const useNarrator = (
         'Contexto multi-timeframe carregando...';
 
       const signal: NarratorSignal = {
+        id: `signal-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         symbol: selectedPair,
         timeframe: selectedTimeframe,
         timestamp: new Date().toISOString(),
@@ -204,10 +209,13 @@ export const useNarrator = (
       };
 
       setFeed((prev) => [signal, ...prev.slice(0, 49)]);
+      
+      // Adicionar sinal ao contexto compartilhado para o Sistema 3 IAs
+      addNarratorSignal(signal);
 
       // Voice synthesis ENRIQUECIDA com validação IA + contexto multi-timeframe
       // Verificar se ainda está ativo antes de falar
-      if (enabled && isPlaying && isRunningRef.current) {
+      if (speakEnabled && enabled && isPlaying && isRunningRef.current) {
         const urgency = aiValidation?.recommendation === 'STRONG_BUY' ? 'ALTA URGÊNCIA' :
                        aiValidation?.recommendation === 'BUY' ? 'Oportunidade forte' :
                        'Oportunidade detectada';
@@ -291,6 +299,7 @@ export const useNarrator = (
   };
 
   const speakLatest = () => {
+    if (!speakEnabled) return;
     if (feed.length > 0) {
       const latest = feed[0];
       const utterance = new SpeechSynthesisUtterance(

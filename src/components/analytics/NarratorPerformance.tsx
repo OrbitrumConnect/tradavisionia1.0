@@ -3,8 +3,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
-import { TrendingUp, TrendingDown, Target, Activity, Award } from 'lucide-react';
+import { TrendingUp, TrendingDown, Target, Activity, Award, ChevronLeft, ChevronRight, Zap, BarChart3 } from 'lucide-react';
 
 interface SignalStats {
   totalSignals: number;
@@ -21,6 +22,8 @@ export const NarratorPerformance = () => {
   const { user } = useAuth();
   const [stats, setStats] = useState<SignalStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
 
   useEffect(() => {
     if (!user) return;
@@ -209,16 +212,26 @@ export const NarratorPerformance = () => {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Melhor Padrão</CardTitle>
-            <Award className="h-4 w-4 text-muted-foreground" />
+        {/* 🏆 MELHOR PADRÃO - COMPACTO */}
+        <Card className="bg-gradient-to-r from-green-500/10 to-blue-500/10 border-green-500/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <Zap className="h-4 w-4 text-yellow-500" />
+              Melhor Padrão
+              <Badge className="ml-auto bg-green-600 text-xs">
+                {topPatterns[0]?.avgProb || 0}%
+              </Badge>
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{topPatterns[0]?.name || 'N/A'}</div>
-            <p className="text-xs text-muted-foreground">
-              {topPatterns[0]?.avgProb || 0}% de probabilidade média
-            </p>
+          <CardContent className="pt-0">
+            <div className="space-y-2">
+              <div className="font-bold text-lg truncate" title={topPatterns[0]?.name || 'N/A'}>
+                {topPatterns[0]?.name || 'N/A'}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {topPatterns[0]?.count || 0} detecções • {topPatterns[0]?.avgProb || 0}% confiança
+              </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -331,44 +344,111 @@ export const NarratorPerformance = () => {
         </Card>
       </div>
 
-      {/* Tabela de todos os padrões */}
+      {/* 📊 TABELA DE PADRÕES COM PAGINAÇÃO */}
       <Card>
         <CardHeader>
-          <CardTitle>Todos os Padrões Detectados</CardTitle>
-          <CardDescription>Estatísticas completas de cada padrão</CardDescription>
+          <CardTitle className="flex items-center gap-2">
+            <BarChart3 className="h-5 w-5" />
+            Todos os Padrões Detectados
+          </CardTitle>
+          <CardDescription>
+            {Object.keys(stats.byPattern).length} padrões encontrados • 
+            Página {currentPage} de {Math.ceil(Object.keys(stats.byPattern).length / itemsPerPage)}
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left p-2">Padrão</th>
-                  <th className="text-center p-2">Quantidade</th>
-                  <th className="text-center p-2">Prob. Média</th>
-                  <th className="text-center p-2">Qualidade</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Object.entries(stats.byPattern)
-                  .sort((a, b) => b[1].avgProb - a[1].avgProb)
-                  .map(([pattern, data]) => (
-                    <tr key={pattern} className="border-b hover:bg-muted/50">
-                      <td className="p-2 font-medium">{pattern}</td>
-                      <td className="text-center p-2">{data.count}</td>
-                      <td className="text-center p-2 font-bold">{data.avgProb}%</td>
-                      <td className="text-center p-2">
-                        {data.avgProb >= 70 ? (
-                          <Badge className="bg-green-600">Alta</Badge>
-                        ) : data.avgProb >= 55 ? (
-                          <Badge className="bg-yellow-600">Média</Badge>
-                        ) : (
-                          <Badge className="bg-red-600">Baixa</Badge>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
+          <div className="space-y-4">
+            {/* Tabela */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="text-left p-3 font-medium">Padrão</th>
+                    <th className="text-center p-3 font-medium">Quantidade</th>
+                    <th className="text-center p-3 font-medium">Prob. Média</th>
+                    <th className="text-center p-3 font-medium">Qualidade</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(stats.byPattern)
+                    .sort((a, b) => b[1].avgProb - a[1].avgProb)
+                    .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                    .map(([pattern, data]) => (
+                      <tr key={pattern} className="border-b hover:bg-muted/30 transition-colors">
+                        <td className="p-3 font-medium">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-primary"></div>
+                            <span className="truncate max-w-[200px]" title={pattern}>
+                              {pattern}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="text-center p-3 font-mono">{data.count}</td>
+                        <td className="text-center p-3 font-bold text-lg">{data.avgProb}%</td>
+                        <td className="text-center p-3">
+                          {data.avgProb >= 70 ? (
+                            <Badge className="bg-green-600 hover:bg-green-700">Alta</Badge>
+                          ) : data.avgProb >= 55 ? (
+                            <Badge className="bg-yellow-600 hover:bg-yellow-700">Média</Badge>
+                          ) : (
+                            <Badge className="bg-red-600 hover:bg-red-700">Baixa</Badge>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Paginação */}
+            {Math.ceil(Object.keys(stats.byPattern).length / itemsPerPage) > 1 && (
+              <div className="flex items-center justify-between pt-4 border-t">
+                <div className="text-sm text-muted-foreground">
+                  Mostrando {(currentPage - 1) * itemsPerPage + 1} a {Math.min(currentPage * itemsPerPage, Object.keys(stats.byPattern).length)} de {Object.keys(stats.byPattern).length} padrões
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="flex items-center gap-1"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Anterior
+                  </Button>
+                  
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: Math.min(5, Math.ceil(Object.keys(stats.byPattern).length / itemsPerPage)) }, (_, i) => {
+                      const page = i + 1;
+                      return (
+                        <Button
+                          key={page}
+                          variant={currentPage === page ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setCurrentPage(page)}
+                          className="w-8 h-8 p-0"
+                        >
+                          {page}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.min(Math.ceil(Object.keys(stats.byPattern).length / itemsPerPage), prev + 1))}
+                    disabled={currentPage === Math.ceil(Object.keys(stats.byPattern).length / itemsPerPage)}
+                    className="flex items-center gap-1"
+                  >
+                    Próxima
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
