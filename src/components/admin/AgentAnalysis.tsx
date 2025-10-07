@@ -20,6 +20,8 @@ import {
   XCircle
 } from 'lucide-react';
 import { useAgentAnalysis } from '@/hooks/useAgentAnalysis';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AgentAnalysisProps {
   selectedSymbol?: string;
@@ -40,6 +42,12 @@ export function AgentAnalysis({
   const [selectedTimeframe, setSelectedTimeframe] = useState('3m');
   const [currentPage, setCurrentPage] = useState(1);
   const signalsPerPage = 5;
+  
+  // Chat com o Agente
+  const [chatMessages, setChatMessages] = useState<Array<{id: string, type: 'user' | 'agent', message: string, timestamp: Date}>>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const { user } = useAuth();
 
   // Debug logs
   useEffect(() => {
@@ -87,6 +95,91 @@ export function AgentAnalysis({
   const handleClearSignals = () => {
     clearSignals();
     setCurrentPage(1);
+  };
+
+  // Enviar mensagem para o Agente
+  const sendMessageToAgent = async () => {
+    if (!chatInput.trim() || !user) return;
+
+    const userMessage = chatInput.trim();
+    setChatInput('');
+    setIsChatLoading(true);
+
+    // Adicionar mensagem do usuário
+    const userMsg = {
+      id: `user-${Date.now()}`,
+      type: 'user' as const,
+      message: userMessage,
+      timestamp: new Date()
+    };
+    setChatMessages(prev => [...prev, userMsg]);
+
+    try {
+      // Enviar para o Agente TradeVision IA
+      const { data, error } = await supabase.functions.invoke('trade-chat', {
+        body: {
+          message: `🤖 CHAT COM AGENTE: ${userMessage}`,
+          userId: user.id,
+          sessionId: `agent-chat-${Date.now()}`,
+          realTimeContext: {
+            analysisType: 'agent-chat',
+            marketData: {
+              symbol: selectedSymbol,
+              timeframe: selectedTimeframe,
+              price: liveData?.price || '0',
+              volume: liveData?.volume || '0'
+            },
+            technicalData: {
+              rsi: technicalIndicators?.rsi14 || 50,
+              macd: technicalIndicators?.macdHistogram || 0,
+              ema9: technicalIndicators?.ema9 || 0,
+              ema20: technicalIndicators?.ema20 || 0
+            },
+            patternData: {
+              orderBlockDetected: patterns?.orderBlockDetected || false,
+              fvgDetected: patterns?.fvgDetected || false,
+              bosDetected: patterns?.bosDetected || false,
+              chochDetected: patterns?.chochDetected || false
+            },
+            timestamp: new Date().toISOString(),
+            chatMode: true
+          }
+        }
+      });
+
+      if (error) {
+        console.error('❌ Erro ao enviar mensagem para o Agente:', error);
+        const errorMsg = {
+          id: `agent-error-${Date.now()}`,
+          type: 'agent' as const,
+          message: 'Desculpe, ocorreu um erro ao processar sua mensagem. Tente novamente.',
+          timestamp: new Date()
+        };
+        setChatMessages(prev => [...prev, errorMsg]);
+        return;
+      }
+
+      // Adicionar resposta do Agente
+      const agentMsg = {
+        id: `agent-${Date.now()}`,
+        type: 'agent' as const,
+        message: data.response || 'Resposta não disponível',
+        timestamp: new Date()
+      };
+      setChatMessages(prev => [...prev, agentMsg]);
+
+    } catch (error) {
+      console.error('❌ Erro na comunicação com o Agente:', error);
+      const errorMsg = {
+        id: `agent-error-${Date.now()}`,
+        type: 'agent' as const,
+        message: 'Erro de conexão. Verifique sua internet e tente novamente.',
+        timestamp: new Date()
+      };
+      setChatMessages(prev => [...prev, errorMsg]);
+    } finally {
+      setIsChatLoading(false);
+    }
   };
 
   const getSignalIcon = (type: string) => {
@@ -217,7 +310,7 @@ export function AgentAnalysis({
         </Card>
       </div>
 
-      {/* Painel Único Organizado */}
+      {/* Painel Único com Sinais e Chat */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Coluna 1: Indicadores Técnicos e Padrões */}
         <div className="space-y-4">
@@ -330,6 +423,84 @@ export function AgentAnalysis({
               )}
             </CardContent>
           </Card>
+
+          {/* Chat com o Agente */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Brain className="h-5 w-5" />
+                Chat com Agente
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {/* Área de Mensagens */}
+              <ScrollArea className="h-[300px] mb-3 p-3 bg-gray-900/20 border border-gray-600/30 rounded-lg">
+                {chatMessages.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-24 text-muted-foreground">
+                    <Brain className="h-6 w-6 mb-1" />
+                    <p className="text-sm">Converse com o Agente</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {chatMessages.map((msg) => (
+                      <div
+                        key={msg.id}
+                        className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}
+                      >
+                        <div
+                          className={`max-w-[85%] p-2 rounded-lg text-xs ${
+                            msg.type === 'user'
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-gray-800/50 text-gray-200 border border-gray-600/30'
+                          }`}
+                        >
+                          <p className="whitespace-pre-wrap">{msg.message}</p>
+                          <p className="opacity-70 mt-1 text-xs">
+                            {msg.timestamp.toLocaleTimeString()}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                    {isChatLoading && (
+                      <div className="flex justify-start">
+                        <div className="bg-gray-800/50 text-gray-200 border border-gray-600/30 p-2 rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-400"></div>
+                            <span className="text-xs">Pensando...</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </ScrollArea>
+
+              {/* Input de Mensagem */}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && sendMessageToAgent()}
+                  placeholder="Pergunte ao Agente..."
+                  className="flex-1 px-2 py-1 text-sm bg-gray-800/50 border border-gray-600/30 rounded text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                  disabled={isChatLoading}
+                />
+                <Button
+                  onClick={sendMessageToAgent}
+                  disabled={!chatInput.trim() || isChatLoading}
+                  size="sm"
+                  className="px-3"
+                >
+                  {isChatLoading ? (
+                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                  ) : (
+                    '→'
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Coluna 2 e 3: Sinais em Tempo Real */}
@@ -338,10 +509,10 @@ export function AgentAnalysis({
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Brain className="h-5 w-5" />
-                Sinais Autênticos do Agente
+                Análise Técnica do Mercado
               </CardTitle>
               <CardDescription>
-                Análise independente sem interferência do Narrador
+                Sinais baseados em dados técnicos e indicadores
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -381,53 +552,6 @@ export function AgentAnalysis({
                             </div>
                           </div>
                           
-                          {/* Panorama Compacto */}
-                          {signal.panorama && (
-                            <div className="bg-gradient-to-r from-blue-900/20 to-indigo-900/20 p-4 rounded-lg border border-blue-500/30 mb-3">
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                                <div className="text-center">
-                                  <div className="text-xs text-blue-200 mb-2">Tendência</div>
-                                  <span className={`px-3 py-1 rounded-full text-xs font-medium border ${
-                                    signal.panorama.trendDirection === 'ALTA' ? 'bg-green-500/20 text-green-400 border-green-500/30' :
-                                    signal.panorama.trendDirection === 'BAIXA' ? 'bg-red-500/20 text-red-400 border-red-500/30' :
-                                    'bg-gray-500/20 text-gray-400 border-gray-500/30'
-                                  }`}>
-                                    {signal.panorama.trendDirection}
-                                  </span>
-                                </div>
-                                <div className="text-center">
-                                  <div className="text-xs text-blue-200 mb-2">Força</div>
-                                  <span className={`px-3 py-1 rounded-full text-xs font-medium border ${
-                                    signal.panorama.signalStrength === 'FORTE' ? 'bg-green-500/20 text-green-400 border-green-500/30' :
-                                    signal.panorama.signalStrength === 'MÉDIO' ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' :
-                                    'bg-red-500/20 text-red-400 border-red-500/30'
-                                  }`}>
-                                    {signal.panorama.signalStrength}
-                                  </span>
-                                </div>
-                                <div className="text-center">
-                                  <div className="text-xs text-blue-200 mb-2">Acurácia</div>
-                                  <span className={`px-3 py-1 rounded-full text-xs font-medium border ${
-                                    signal.panorama.accuracy >= 80 ? 'bg-green-500/20 text-green-400 border-green-500/30' :
-                                    signal.panorama.accuracy >= 60 ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' :
-                                    'bg-red-500/20 text-red-400 border-red-500/30'
-                                  }`}>
-                                    {signal.panorama.accuracy}%
-                                  </span>
-                                </div>
-                                <div className="text-center">
-                                  <div className="text-xs text-blue-200 mb-2">Risco</div>
-                                  <span className={`px-3 py-1 rounded-full text-xs font-medium border ${
-                                    signal.risk === 'BAIXO' ? 'bg-green-500/20 text-green-400 border-green-500/30' :
-                                    signal.risk === 'MÉDIO' ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' :
-                                    'bg-red-500/20 text-red-400 border-red-500/30'
-                                  }`}>
-                                    {signal.risk}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          )}
                           
                           
                           {/* Análise Detalhada do Agente */}
