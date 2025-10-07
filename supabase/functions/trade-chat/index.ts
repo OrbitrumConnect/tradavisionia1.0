@@ -342,6 +342,107 @@ class TradeVisionAI {
   }
 
 
+  // NOVO: Função para lidar com consultas do Narrador
+  async handleNarratorConsultation(message: string, realTimeContext: any, userId: string) {
+    try {
+      const pattern = realTimeContext.pattern;
+      const marketData = realTimeContext.marketData;
+      const indicators = realTimeContext.technicalIndicators;
+      
+      console.log('🧠 Analisando padrão do Narrador:', pattern.type);
+      
+      // Análise técnica do padrão
+      let analysis = '';
+      let recommendation = 'WAIT';
+      let confidence = 50;
+      
+      // Analisar RSI
+      if (indicators?.RSI) {
+        if (indicators.RSI < 30) {
+          analysis += 'RSI em sobrevenda (30), indicando possível reversão. ';
+          confidence += 15;
+        } else if (indicators.RSI > 70) {
+          analysis += 'RSI em sobrecompra (70), indicando possível reversão. ';
+          confidence += 15;
+        } else {
+          analysis += 'RSI neutro, aguardando confirmação. ';
+        }
+      }
+      
+      // Analisar MACD
+      if (indicators?.MACD) {
+        if (indicators.MACD.histogram > 0) {
+          analysis += 'MACD positivo, momentum de alta. ';
+          confidence += 10;
+        } else if (indicators.MACD.histogram < 0) {
+          analysis += 'MACD negativo, momentum de baixa. ';
+          confidence += 10;
+        }
+      }
+      
+      // Analisar padrão específico
+      switch (pattern.type) {
+        case 'Order Block':
+          analysis += 'Order Block detectado - nível de suporte/resistência forte. ';
+          confidence += 20;
+          recommendation = 'GENERATE_SIGNAL';
+          break;
+        case 'FVG':
+          analysis += 'Fair Value Gap identificado - zona de liquidez. ';
+          confidence += 15;
+          recommendation = 'GENERATE_SIGNAL';
+          break;
+        case 'CHOCH':
+          analysis += 'Change of Character detectado - possível reversão de tendência. ';
+          confidence += 25;
+          recommendation = 'GENERATE_SIGNAL';
+          break;
+        case 'BOS':
+          analysis += 'Break of Structure confirmado - continuação de tendência. ';
+          confidence += 20;
+          recommendation = 'GENERATE_SIGNAL';
+          break;
+        default:
+          analysis += 'Padrão técnico detectado, mas aguardando confirmação. ';
+          confidence += 5;
+      }
+      
+      // Verificar contexto de preço
+      if (marketData?.price) {
+        const price = parseFloat(marketData.price.replace(/[,$]/g, ''));
+        if (price > 0) {
+          analysis += `Preço atual: $${price.toLocaleString()}. `;
+        }
+      }
+      
+      // Decisão final
+      const finalRecommendation = confidence >= 70 ? 'GENERATE_SIGNAL' : 'WAIT';
+      const finalConfidence = Math.min(confidence, 95);
+      
+      const response = `🧠 ANÁLISE DO AGENTE: ${analysis}${finalRecommendation === 'GENERATE_SIGNAL' ? 'RECOMENDO: Gerar sinal com ' + finalConfidence + '% de confiança.' : 'AGUARDAR: Confiança insuficiente (' + finalConfidence + '%).'} Contexto: ${pattern.type} em ${marketData?.symbol || 'N/A'}.`;
+      
+      return {
+        response,
+        contextType: 'narrator-consultation',
+        referenceChunks: [],
+        conversationState: { pattern, marketData, indicators },
+        recommendation: finalRecommendation,
+        confidence: finalConfidence
+      };
+      
+    } catch (error) {
+      console.error('❌ Erro na consulta do Narrador:', error);
+      return {
+        response: 'Erro na análise. Aguardar próxima oportunidade.',
+        contextType: 'error',
+        referenceChunks: [],
+        conversationState: {},
+        recommendation: 'WAIT',
+        confidence: 0
+      };
+    }
+  }
+
   // Sistema conversacional humanizado com IA + contexto em tempo real
   async generateResponse(
     message: string, 
@@ -350,7 +451,7 @@ class TradeVisionAI {
     realTimeContext?: any,
     userEmbedding?: number[],
     image?: string
-  ): Promise<{ response: string; contextType: string; referenceChunks: string[]; conversationState: any }> {
+  ): Promise<{ response: string; contextType: string; referenceChunks: string[]; conversationState: any; recommendation?: string; confidence?: number }> {
     // Se houver imagem, usar LLM com visão para extrair texto e análise
     if (image) {
       const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
@@ -415,6 +516,16 @@ class TradeVisionAI {
           conversationState: {}
         };
       }
+    }
+
+    // 0. DETECTAR CONSULTA DO NARRADOR
+    const isNarratorConsultation = message.includes('🎙️ NARRADOR') && 
+                                   message.includes('CONSULTANDO') &&
+                                   realTimeContext?.consultationType === 'narrator-signal-validation';
+    
+    if (isNarratorConsultation) {
+      console.log('🎙️ Detectada consulta do Narrador:', realTimeContext.pattern);
+      return await this.handleNarratorConsultation(message, realTimeContext, userId);
     }
 
     // 1. BUSCA SEMÂNTICA

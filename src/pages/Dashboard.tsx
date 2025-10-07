@@ -48,7 +48,7 @@ const Dashboard = ({ onLogout, onBackToLanding }: DashboardProps) => {
   // Multi-exchange real-time data
   const [selectedExchange, setSelectedExchange] = useState('binance');
   const [selectedPair, setSelectedPair] = useState('BTC/USDT');
-  const [selectedTimeframe, setSelectedTimeframe] = useState('1m');
+  const [selectedTimeframe, setSelectedTimeframe] = useState('3m'); // M3 para melhor precisão
   const { candles, liveData, isConnected, loading, availablePairs, availableTimeframes, exchanges, lastUpdateTime } = useMultiExchangeData(selectedExchange, selectedPair, selectedTimeframe);
   
   // States
@@ -110,13 +110,19 @@ const Dashboard = ({ onLogout, onBackToLanding }: DashboardProps) => {
 
   // Iniciar narrador automaticamente quando tudo estiver pronto
   useEffect(() => {
+    console.log('🔍 Debug Dashboard - narratorEnabled:', narratorEnabled);
+    console.log('🔍 Debug Dashboard - liveData:', liveData);
+    console.log('🔍 Debug Dashboard - narrator.isPlaying:', narrator.isPlaying);
+    console.log('🔍 Debug Dashboard - technicalIndicators:', technicalIndicators);
+    console.log('🔍 Debug Dashboard - patterns:', patterns);
+    
     if (narratorEnabled && liveData && !narrator.isPlaying) {
       console.log('🚀 Iniciando narrador automaticamente...');
       setTimeout(() => {
         narrator.toggle(); // Iniciar automaticamente
       }, 3000); // Aguardar 3 segundos para carregar dados
     }
-  }, [narratorEnabled, liveData, narrator.isPlaying]);
+  }, [narratorEnabled, liveData, narrator.isPlaying, technicalIndicators, patterns]);
 
   // Salvar features periodicamente (a cada novo candle)
   useEffect(() => {

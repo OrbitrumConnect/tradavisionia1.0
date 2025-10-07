@@ -94,6 +94,55 @@ export const useNarrator = (
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isRunningRef = useRef(false);
 
+  // NOVO: Função para consultar Agente antes de gerar sinal
+  const consultAgentBeforeSignal = async (pattern: any, symbol: string, timeframe: string, liveData: any, indicators: any) => {
+    try {
+      console.log('🤖 Consultando Agente TradeVision IA...');
+      
+      const { data, error } = await supabase.functions.invoke('trade-chat', {
+        body: {
+          message: `🎙️ NARRADOR ${timeframe.toUpperCase()} CONSULTANDO: Detectei ${pattern.type} em ${symbol} a ${liveData?.price || 'N/A'}. RSI: ${indicators?.RSI?.toFixed(1) || 'N/A'}. MACD: ${indicators?.MACD?.histogram?.toFixed(2) || 'N/A'}. Devo gerar sinal? Qual sua análise?`,
+          userId: user?.id,
+          sessionId: `narrator-consultation-${Date.now()}`,
+          realTimeContext: {
+            pattern,
+            marketData: {
+              symbol,
+              timeframe,
+              price: liveData?.price || '0',
+              volume: liveData?.volume || '0'
+            },
+            technicalIndicators: indicators,
+            consultationType: 'narrator-signal-validation',
+            timestamp: new Date().toISOString()
+          }
+        }
+      });
+
+      if (error) {
+        console.error('❌ Erro ao consultar Agente:', error);
+        return { recommendation: 'WAIT', reasoning: 'Erro na consulta ao Agente' };
+      }
+
+      // Extrair recomendação da resposta do Agente
+      const response = data.response || '';
+      const isApproved = response.includes('GENERATE_SIGNAL') || 
+                        response.includes('gerar sinal') || 
+                        response.includes('recomendo') ||
+                        response.includes('aprovado');
+      
+      return {
+        recommendation: isApproved ? 'GENERATE_SIGNAL' : 'WAIT',
+        reasoning: response,
+        confidence: data.confidence || 70,
+        agentResponse: data
+      };
+    } catch (error) {
+      console.error('❌ Erro na consulta ao Agente:', error);
+      return { recommendation: 'WAIT', reasoning: 'Erro na consulta' };
+    }
+  };
+
   const generateSignal = async () => {
     // Verificar se ainda está ativo antes de gerar
     if (!enabled || !isPlaying || !liveData || !user || !isRunningRef.current) {
@@ -102,12 +151,17 @@ export const useNarrator = (
     }
 
     console.log('🎙️ Iniciando geração de sinal inteligente...');
+    console.log('🔍 Debug - detectedPatterns:', detectedPatterns);
+    console.log('🔍 Debug - liveData:', liveData);
+    console.log('🔍 Debug - technicalIndicators:', technicalIndicators);
 
     // APENAS análise inteligente real - SEM FALLBACK FICTÍCIO
     if (detectedPatterns && Object.keys(detectedPatterns).length > 0) {
+      console.log('✅ Padrões detectados, gerando sinal...');
       await generateIntelligentSignal();
     } else {
       console.log('⏳ Aguardando padrões serem detectados...');
+      console.log('🔍 Debug - detectedPatterns é null/undefined ou vazio');
     }
   };
 
@@ -135,6 +189,15 @@ export const useNarrator = (
         resistance_level: detectedPatterns.resistanceLevel,
         detected_at: detectedAt
       };
+
+      // NOVO: Consultar Agente TradeVision IA antes de gerar sinal
+      const agentValidation = await consultAgentBeforeSignal(pattern, selectedPair, selectedTimeframe, liveData, technicalIndicators);
+      
+      // Só prosseguir se Agente aprovar
+      if (agentValidation.recommendation !== 'GENERATE_SIGNAL') {
+        console.log('⏸️ Sinal descartado pelo Agente:', agentValidation.reasoning);
+        return;
+      }
 
       // Buscar notícia real da API
       const latestNews = await fetchLatestNews(selectedPair);
@@ -198,13 +261,13 @@ export const useNarrator = (
         timeframe: selectedTimeframe,
         timestamp: new Date().toISOString(),
         type: data.signal.signal_type,
-        probability: data.signal.probability,
+        probability: agentValidation.confidence || data.signal.probability, // Usar confiança do Agente
         pattern: data.signal.pattern,
-        figure: `${data.signal.figure} | ${mtContextText}`,
+        figure: `${data.signal.figure} | Agente: ${agentValidation.reasoning.substring(0, 100)}... | ${mtContextText}`,
         risk: data.signal.risk_note,
         price: data.signal.price,
         news: data.signal.news || '',
-        marketStatus: `${data.signal.market_status} | IA: ${aiValidation?.recommendation || 'VALIDADO'} | ${totalAnalysisTime}ms`,
+        marketStatus: `${data.signal.market_status} | Agente Validado: ${agentValidation.confidence}% | IA: ${aiValidation?.recommendation || 'VALIDADO'} | ${totalAnalysisTime}ms`,
         pairData: pairInfo[selectedPair as keyof typeof pairInfo] || pairInfo['BTC/USDT']
       };
 
@@ -254,15 +317,22 @@ export const useNarrator = (
     if (isRunningRef.current) return;
     
     console.log('🎙️ Narrador iniciado');
+    console.log('🔍 Debug - enabled:', enabled);
+    console.log('🔍 Debug - isPlaying:', isPlaying);
+    console.log('🔍 Debug - liveData:', liveData);
+    console.log('🔍 Debug - user:', user);
+    
     isRunningRef.current = true;
     
     // Gerar primeiro sinal imediatamente
     timeoutRef.current = setTimeout(() => {
+      console.log('⏰ Timeout executado - tentando gerar sinal...');
       generateSignal();
     }, 1000);
     
     // Continuar gerando sinais a cada 1 minuto
     intervalRef.current = setInterval(() => {
+      console.log('⏰ Interval executado - tentando gerar sinal...');
       generateSignal();
     }, 60000);
   };
