@@ -1,4 +1,6 @@
+// @ts-ignore
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+// @ts-ignore
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { SemanticSearch } from './TradeVisionAI.ts';
 
@@ -211,7 +213,7 @@ class TradeVisionAI {
     realTimeContext: any,
     profile: any
   ): Promise<string | null> {
-    const alerts = [];
+    const alerts: string[] = [];
 
     // Alert Fear & Greed extremo
     if (
@@ -461,7 +463,7 @@ class TradeVisionAI {
   ): Promise<{ response: string; contextType: string; referenceChunks: string[]; conversationState: any; recommendation?: string; confidence?: number }> {
     // Se houver imagem, usar LLM com visão para extrair texto e análise
     if (image) {
-      const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+      const LOVABLE_API_KEY = (globalThis as any).Deno?.env?.get('LOVABLE_API_KEY') || process.env.LOVABLE_API_KEY;
       if (!LOVABLE_API_KEY) {
         console.error('❌ LOVABLE_API_KEY não configurada');
         return {
@@ -586,7 +588,7 @@ class TradeVisionAI {
     const questionType = this.detectQuestionType(message);
     
     // Simular cenários se for análise
-    let scenarios = null;
+    let scenarios: any[] = [];
     if (enrichedContext?.price) {
       const priceNum = typeof enrichedContext.price === 'string' 
         ? parseFloat(enrichedContext.price.replace(/,/g, ''))
@@ -600,7 +602,7 @@ class TradeVisionAI {
     }
 
     // 🤖 USAR GEMINI PARA RESPOSTA CONVERSACIONAL HUMANIZADA
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    const LOVABLE_API_KEY = (globalThis as any).Deno?.env?.get('LOVABLE_API_KEY') || process.env.LOVABLE_API_KEY;
     let responseText = '';
     
     if (LOVABLE_API_KEY) {
@@ -611,7 +613,7 @@ class TradeVisionAI {
           knowledge,
           enrichedContext,
           signals,
-          scenarios,
+          scenarios || [],
           semanticContext,
           multiTimeframeContext
         );
@@ -762,7 +764,7 @@ Agora responda com maestria, elegância e precisão humana.`
         risk_level: profile.risk_level,
         trading_style: profile.trading_style
       },
-      simulationsGenerated: scenarios?.length || 0
+      simulationsGenerated: (scenarios as any[])?.length || 0
     };
 
     return {
@@ -1084,7 +1086,8 @@ Agora responda com maestria, elegância e precisão humana.`
         return response;
 
       case 'analysis_start':
-        response += this.buildAnalysisResponse(knowledge, rt, signals, randomClosing, scenarios);
+        // @ts-ignore
+        response += this.buildAnalysisResponse(knowledge, rt, signals, randomClosing, scenarios as any);
         return response;
 
       case 'price': {
@@ -1126,7 +1129,8 @@ Agora responda com maestria, elegância e precisão humana.`
       }
 
       case 'market_status':
-        response += this.buildAnalysisResponse(knowledge, rt, signals, randomClosing, scenarios);
+        // @ts-ignore
+        response += this.buildAnalysisResponse(knowledge, rt, signals, randomClosing, scenarios as any);
         return response;
 
       case 'followup':
@@ -1236,7 +1240,8 @@ Agora responda com maestria, elegância e precisão humana.`
     return fallbacks[Math.floor(Math.random() * fallbacks.length)];
   }
 
-  buildAnalysisResponse(knowledge: any[], rt: any, signals: any[], closing: string, scenarios?: any[] | null): string {
+  buildAnalysisResponse(knowledge: any[], rt: any, signals: any[], closing: string, scenarios?: any): string {
+    const safeScenarios = scenarios || [];
     const intros = [
       `Analisando o cenário atual do mercado`,
       `Vamos ver o que os dados mostram`,
@@ -1278,9 +1283,9 @@ Agora responda com maestria, elegância e precisão humana.`
     }
 
     // Simulações de cenários
-    if (scenarios && scenarios.length > 0) {
+    if (safeScenarios && safeScenarios.length > 0) {
       response += `🎯 **Simulações de Cenários (What-If Analysis)**:\n\n`;
-      scenarios.forEach((scenario, i) => {
+      safeScenarios.forEach((scenario, i) => {
         response += `**Cenário ${i + 1}: ${scenario.description}**\n`;
         response += `   • Entrada: $${scenario.entry_price.toFixed(2)}\n`;
         response += `   • Stop Loss: $${scenario.stop_loss.toFixed(2)}\n`;
@@ -1662,8 +1667,8 @@ serve(async (req) => {
 
     // Conectar ao Supabase
     const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      (globalThis as any).Deno?.env?.get('SUPABASE_URL') || process.env.SUPABASE_URL || '',
+      (globalThis as any).Deno?.env?.get('SUPABASE_SERVICE_ROLE_KEY') || process.env.SUPABASE_SERVICE_ROLE_KEY || ''
     );
 
     // Motor de IA próprio com contexto em tempo real + BUSCA SEMÂNTICA + VISÃO

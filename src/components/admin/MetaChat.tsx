@@ -91,14 +91,14 @@ export const MetaChat = ({ symbol, onConsolidationComplete }: MetaChatProps) => 
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('meta_chat_history')
+        .from('meta_chat_history' as any)
         .select('*')
         .eq('symbol', symbol)
         .order('timestamp', { ascending: false })
         .limit(50);
 
       if (error) throw error;
-      setMessages(data || []);
+      setMessages((data as any) || []);
     } catch (error) {
       console.error('Erro ao carregar mensagens:', error);
     } finally {
@@ -115,7 +115,7 @@ export const MetaChat = ({ symbol, onConsolidationComplete }: MetaChatProps) => 
       
       // Buscar mensagem original do narrador
       const { data: narratorMessage, error: narratorError } = await supabase
-        .from('narrator_output')
+        .from('narrator_output' as any)
         .select('*')
         .eq('id', agentInsight.narrator_id)
         .single();
@@ -130,12 +130,12 @@ export const MetaChat = ({ symbol, onConsolidationComplete }: MetaChatProps) => 
       
       // Salvar consolidação no banco
       const { data, error } = await supabase
-        .from('meta_chat_history')
+        .from('meta_chat_history' as any)
         .insert({
-          narrator_id: narratorMessage.id,
+          narrator_id: (narratorMessage as any).id,
           agent_id: agentInsight.id,
           symbol: symbol,
-          narrator_text: narratorMessage.narrator_text,
+          narrator_text: (narratorMessage as any).narrator_text,
           agent_text: agentInsight.insight_text,
           combined_summary: consolidation.summary,
           learning_insights: consolidation.learningInsights,
@@ -149,12 +149,13 @@ export const MetaChat = ({ symbol, onConsolidationComplete }: MetaChatProps) => 
       if (error) throw error;
       
       console.log('✅ Consolidação gerada pelo meta chat:', data);
-      setMessages(prev => [data, ...prev]);
-      onConsolidationComplete?.(data);
+      // @ts-ignore
+      setMessages((prev: any) => [(data as any), ...prev]);
+      onConsolidationComplete?.(data as any);
       
       // Disparar backtesting se necessário
       if (consolidation.shouldTriggerBacktesting) {
-        await triggerBacktesting(data);
+        await triggerBacktesting(data as any);
       }
       
     } catch (error) {
@@ -224,7 +225,7 @@ export const MetaChat = ({ symbol, onConsolidationComplete }: MetaChatProps) => 
       
       // Atualizar flag de backtesting
       await supabase
-        .from('meta_chat_history')
+        .from('meta_chat_history' as any)
         .update({ backtesting_triggered: true })
         .eq('id', metaMessage.id);
       

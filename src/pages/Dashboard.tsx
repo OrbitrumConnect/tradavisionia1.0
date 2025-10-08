@@ -253,6 +253,21 @@ const Dashboard = ({ onLogout, onBackToLanding }: DashboardProps) => {
   useEffect(() => {
     if (!liveData) return;
 
+    // Calcular volatilidade (ATR simplificado)
+    const volatility = candles.length >= 14 
+      ? candles.slice(-14).reduce((sum, c) => sum + (c.high - c.low), 0) / 14 
+      : 0;
+
+    // Calcular momentum (taxa de mudança de preço)
+    const momentum = candles.length >= 10
+      ? ((candles[candles.length - 1].close - candles[candles.length - 10].close) / candles[candles.length - 10].close) * 100
+      : 0;
+
+    // Determinar tendência
+    const trend = marketPressure === 'OTIMISTA' ? 'ALTISTA' 
+                : marketPressure === 'PESSIMISTA' ? 'BAIXISTA' 
+                : 'LATERAL';
+
     marketContext.updateMarketData({
       symbol: selectedPair,
       price: liveData.price || '0',
@@ -260,8 +275,17 @@ const Dashboard = ({ onLogout, onBackToLanding }: DashboardProps) => {
       fearGreedIndex,
       buyerDominance,
       marketPressure,
+      // 🆕 Status do Dia
+      volatility: Math.round(volatility * 100) / 100,
+      volume: liveData.volume || '0',
+      trend,
+      momentum: Math.round(momentum * 100) / 100,
+      // 🆕 Dados Técnicos
+      technicalIndicators,
+      patterns,
+      candles: candles.slice(-50), // Últimos 50 candles
     });
-  }, [liveData, selectedPair, selectedTimeframe, fearGreedIndex, buyerDominance, marketPressure]);
+  }, [liveData, selectedPair, selectedTimeframe, fearGreedIndex, buyerDominance, marketPressure, technicalIndicators, patterns, candles]);
 
   // Salvar sinais do narrador no banco para o Admin Dashboard coletar (evitar duplicados)
   const [lastSavedSignal, setLastSavedSignal] = useState<string | null>(null);

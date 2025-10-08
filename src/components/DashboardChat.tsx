@@ -231,12 +231,24 @@ export function DashboardChat() {
           conversationId: currentConversationId,
           conversationContext,
           marketContext: {
+            // Dados básicos
             symbol: marketContext.symbol,
             price: marketContext.price,
             timeframe: marketContext.timeframe,
+            // Indicadores de sentimento
             fearGreedIndex: marketContext.fearGreedIndex,
             buyerDominance: marketContext.buyerDominance,
             marketPressure: marketContext.marketPressure,
+            // 🆕 Status do Dia
+            volatility: marketContext.volatility,
+            volume: marketContext.volume,
+            trend: marketContext.trend,
+            momentum: marketContext.momentum,
+            // 🆕 Dados Técnicos
+            technicalIndicators: marketContext.technicalIndicators,
+            patterns: marketContext.patterns,
+            candles: marketContext.candles,
+            // Sinais do narrador
             narratorFeed: marketContext.narratorFeed,
           }
         }
@@ -331,12 +343,24 @@ export function DashboardChat() {
           sessionId,
           conversationId,
           marketContext: {
+            // Dados básicos
             currentPrice: marketContext.price,
             symbol: marketContext.symbol,
             timeframe: marketContext.timeframe,
+            // Indicadores de sentimento
             fearGreedIndex: marketContext.fearGreedIndex,
             buyerDominance: marketContext.buyerDominance,
             marketPressure: marketContext.marketPressure,
+            // 🆕 Status do Dia
+            volatility: marketContext.volatility,
+            volume: marketContext.volume,
+            trend: marketContext.trend,
+            momentum: marketContext.momentum,
+            // 🆕 Dados Técnicos
+            technicalIndicators: marketContext.technicalIndicators,
+            patterns: marketContext.patterns,
+            candles: marketContext.candles,
+            // Sinais do narrador
             narratorSignals: marketContext.narratorFeed,
           }
         }
@@ -621,6 +645,15 @@ export function DashboardChat() {
           </Badge>
           <Badge variant="outline" className="text-xs">
             📈 Compradores: {marketContext.buyerDominance || 50}%
+          </Badge>
+          <Badge variant="outline" className="text-xs">
+            📊 Vol: {marketContext.volatility || 0}
+          </Badge>
+          <Badge variant="outline" className="text-xs">
+            🎯 {marketContext.trend || 'LATERAL'}
+          </Badge>
+          <Badge variant="outline" className="text-xs">
+            ⚡ Momentum: {marketContext.momentum ? `${marketContext.momentum.toFixed(2)}%` : '0%'}
           </Badge>
         </div>
           </TabsContent>

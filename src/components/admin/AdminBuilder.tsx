@@ -17,7 +17,7 @@ interface ProcessedDocument {
   error_message: string | null; 
 }
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 5; // 5 itens por página = mais páginas para navegar - ATUALIZADO
 
 const StatusCard = ({ label, status }: { label: string; status: string }) => (
   <div className="flex items-center justify-between p-3 bg-slate-600 rounded">
@@ -176,21 +176,46 @@ export const AdminBuilder = () => {
   }, [knowledge, currentPage]);
 
   const totalPages = Math.ceil(knowledge.length / ITEMS_PER_PAGE);
+  console.log('DEBUG: knowledge.length =', knowledge.length, 'ITEMS_PER_PAGE =', ITEMS_PER_PAGE, 'totalPages =', totalPages);
+  
+  // FORÇAR MUDANÇA PARA TESTE
+  const FORCE_TOTAL_PAGES = Math.ceil(knowledge.length / 5);
+  console.log('FORCE_TOTAL_PAGES =', FORCE_TOTAL_PAGES);
+
+  // Função para sanitizar texto e remover caracteres Unicode problemáticos
+  const sanitizeText = (text: string): string => {
+    return text
+      // Remover caracteres de controle Unicode
+      .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
+      // Remover sequências de escape Unicode inválidas
+      .replace(/\\u[0-9a-fA-F]{0,3}(?![0-9a-fA-F])/g, '')
+      // Normalizar espaços em branco
+      .replace(/\s+/g, ' ')
+      // Remover caracteres especiais problemáticos
+      .replace(/[\uFFFE\uFFFF]/g, '')
+      .trim();
+  };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !user) return;
 
     // Validar tipo de arquivo
-    const allowedTypes = ['text/plain', 'text/markdown'];
-    const allowedExtensions = ['.txt', '.md'];
+    const allowedTypes = [
+      'text/plain', 
+      'text/markdown',
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/msword'
+    ];
+    const allowedExtensions = ['.txt', '.md', '.pdf', '.docx', '.doc'];
     const isValidType = allowedTypes.includes(file.type) || 
                        allowedExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
 
     if (!isValidType) {
       toast({
         title: 'Tipo de arquivo não suportado',
-        description: 'Por enquanto, apenas arquivos TXT e MD são aceitos.',
+        description: 'Apenas arquivos TXT, MD, PDF e DOCX são aceitos.',
         variant: 'destructive',
       });
       return;
@@ -235,18 +260,25 @@ export const AdminBuilder = () => {
         throw new Error(`Erro ao registrar documento: ${insertError.message}`);
       }
 
-      // Inserir cada chunk na base de conhecimento
-      const knowledgeEntries = chunks.map(chunk => ({
-        topic: chunk.topic,
-        content: chunk.content,
-        category: 'Documento',
-        examples: [],
-        metadata: {
-          source: file.name,
-          document_id: docRecord.id,
-          extracted_at: new Date().toISOString()
-        }
-      }));
+      // Inserir cada chunk na base de conhecimento (com sanitização)
+      const knowledgeEntries = chunks
+        .map(chunk => ({
+          topic: sanitizeText(chunk.topic || 'Sem título'),
+          content: sanitizeText(chunk.content || ''),
+          category: 'Documento',
+          examples: [],
+          metadata: {
+            source: file.name,
+            document_id: docRecord.id,
+            extracted_at: new Date().toISOString()
+          }
+        }))
+        // Filtrar chunks vazios ou muito pequenos
+        .filter(entry => entry.content.length > 10);
+
+      if (knowledgeEntries.length === 0) {
+        throw new Error('Nenhum conteúdo válido foi extraído do documento');
+      }
 
       const { error: knowledgeError } = await supabase
         .from('bot_knowledge')
@@ -261,14 +293,14 @@ export const AdminBuilder = () => {
         .from('processed_documents')
         .update({
           status: 'completed',
-          extracted_entries: chunks.length,
+          extracted_entries: knowledgeEntries.length,
           processed_at: new Date().toISOString()
         })
         .eq('id', docRecord.id);
 
       toast({
-        title: 'Documento processado!',
-        description: `${chunks.length} novos conhecimentos foram adicionados.`,
+        title: 'Documento processado com sucesso!',
+        description: `${knowledgeEntries.length} chunks de conhecimento foram adicionados à base.`,
       });
 
       // Atualizar dados
@@ -353,8 +385,10 @@ export const AdminBuilder = () => {
       });
     }
 
-    console.log(`Extracted ${chunks.length} chunks from ${fileName}`);
-    return chunks.filter(chunk => chunk.content.length > 50); // Remover chunks muito pequenos
+    console.log(`✅ Extracted ${chunks.length} chunks from ${fileName}`);
+    const validChunks = chunks.filter(chunk => chunk.content.length > 50);
+    console.log(`📊 Valid chunks after filtering: ${validChunks.length}`);
+    return validChunks;
   };
 
   const getStatusIcon = (status: string) => {
@@ -500,7 +534,7 @@ export const AdminBuilder = () => {
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept=".txt,.md,text/plain,text/markdown"
+                    accept=".txt,.md,.pdf,.docx,.doc,text/plain,text/markdown,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword"
                     onChange={handleFileUpload}
                     className="hidden"
                     disabled={uploading}
@@ -509,9 +543,10 @@ export const AdminBuilder = () => {
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploading}
                     className="flex items-center gap-2 px-3 py-2 rounded bg-primary text-white hover:bg-primary/90 transition-colors disabled:opacity-50"
+                    title="Upload de arquivos: TXT, MD, PDF, DOCX"
                   >
                     <Upload className="h-4 w-4" />
-                    {uploading ? 'Processando...' : 'Upload'}
+                    {uploading ? 'Processando...' : 'Upload (TXT/MD/PDF/DOCX)'}
                   </button>
                 </div>
               </div>
@@ -548,7 +583,7 @@ export const AdminBuilder = () => {
                   </button>
                   
                   <span className="text-sm text-gray-400">
-                    Página {currentPage} de {totalPages}
+                    Página {currentPage} de {FORCE_TOTAL_PAGES}
                   </span>
                   
                   <button
