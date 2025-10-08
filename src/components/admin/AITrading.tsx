@@ -204,7 +204,15 @@ export function AITrading({ symbol = 'BTC/USDT' }: AITradingProps) {
       timestamp: new Date().toISOString()
     };
 
-    setChatMessages(prev => [newMessage, ...prev]);
+    // Verificar se mensagem já existe (evitar duplicatas)
+    setChatMessages(prev => {
+      const exists = prev.some(m => m.content === message && m.role === newMessage.role);
+      if (exists) {
+        console.log('⚠️ Mensagem duplicada ignorada:', message.substring(0, 50));
+        return prev;
+      }
+      return [newMessage, ...prev];
+    });
 
     if (!isSystem) {
       // Chamar TradeVision IA real
