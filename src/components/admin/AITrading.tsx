@@ -90,6 +90,19 @@ export function AITrading({ symbol = 'BTC/USDT' }: AITradingProps) {
   // Contador único para IDs de mensagens
   const messageCounterRef = useRef(0);
   
+  // Limpar mensagens duplicadas ao iniciar
+  useEffect(() => {
+    setChatMessages(prev => {
+      const uniqueMessages = Array.from(
+        new Map(prev.map(m => [m.id, m])).values()
+      );
+      if (uniqueMessages.length !== prev.length) {
+        console.log('🧹 Limpando mensagens duplicadas:', prev.length - uniqueMessages.length);
+      }
+      return uniqueMessages;
+    });
+  }, []);
+  
   // 📊 Performance de Sinais do Narrador
   const [narratorStats, setNarratorStats] = useState({
     totalSignals: 0,
