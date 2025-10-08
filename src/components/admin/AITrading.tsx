@@ -87,6 +87,9 @@ export function AITrading({ symbol = 'BTC/USDT' }: AITradingProps) {
   const [nextTradeTime, setNextTradeTime] = useState<Date | null>(null);
   const [brazilTime, setBrazilTime] = useState<string>('');
   
+  // Contador único para IDs de mensagens
+  const messageCounterRef = useRef(0);
+  
   // 📊 Performance de Sinais do Narrador
   const [narratorStats, setNarratorStats] = useState({
     totalSignals: 0,
@@ -193,8 +196,9 @@ export function AITrading({ symbol = 'BTC/USDT' }: AITradingProps) {
 
   // Função para enviar mensagem ao TradeVision IA
   const sendMessageToAI = async (message: string, isSystem: boolean = false) => {
+    messageCounterRef.current += 1;
     const newMessage = {
-      id: `msg-${Date.now()}`,
+      id: `msg-${Date.now()}-${messageCounterRef.current}`,
       role: isSystem ? 'system' : 'user',
       content: message,
       timestamp: new Date().toISOString()
