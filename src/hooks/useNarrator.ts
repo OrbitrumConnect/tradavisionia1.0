@@ -166,7 +166,7 @@ export const useNarrator = (
       }
 
       // Calcular win rate do padrão
-      const wins = history.filter(h => h.result === 'WIN').length;
+      const wins = history.filter((h: any) => h.result === 'WIN').length;
       const total = history.length;
       const winRate = (wins / total) * 100;
 

@@ -86,6 +86,61 @@ export function AITrading({ symbol = 'BTC/USDT' }: AITradingProps) {
   const [manualExitTrigger, setManualExitTrigger] = useState(false);
   const [nextTradeTime, setNextTradeTime] = useState<Date | null>(null);
   const [brazilTime, setBrazilTime] = useState<string>('');
+  
+  // 📊 Performance de Sinais do Narrador
+  const [narratorStats, setNarratorStats] = useState({
+    totalSignals: 0,
+    validatedSignals: 0,
+    wins: 0,
+    losses: 0,
+    winRate: 0,
+    avgVariation: 0
+  });
+
+  // 📊 Carregar Performance de Sinais do Narrador
+  useEffect(() => {
+    const loadNarratorPerformance = async () => {
+      try {
+        const { data: validatedSignals, error } = await supabase
+          .from('narrator_signals')
+          .select('*')
+          .not('result', 'is', null);
+
+        if (error) throw error;
+
+        const { data: allSignals } = await supabase
+          .from('narrator_signals')
+          .select('id');
+
+        const wins = validatedSignals?.filter((s: any) => s.result === 'WIN').length || 0;
+        const losses = validatedSignals?.filter((s: any) => s.result === 'LOSS').length || 0;
+        const total = validatedSignals?.length || 0;
+        const winRate = total > 0 ? (wins / total) * 100 : 0;
+
+        const variations = validatedSignals
+          ?.filter((s: any) => s.variation)
+          .map((s: any) => parseFloat(s.variation.replace('%', '').replace('+', ''))) || [];
+        const avgVariation = variations.length > 0 
+          ? variations.reduce((a, b) => a + b, 0) / variations.length 
+          : 0;
+
+        setNarratorStats({
+          totalSignals: allSignals?.length || 0,
+          validatedSignals: total,
+          wins,
+          losses,
+          winRate,
+          avgVariation
+        });
+      } catch (error) {
+        console.error('❌ Erro ao carregar performance do narrador:', error);
+      }
+    };
+
+    loadNarratorPerformance();
+    const interval = setInterval(loadNarratorPerformance, 30000); // Atualiza a cada 30s
+    return () => clearInterval(interval);
+  }, []);
 
   // Timer do Brasil
   useEffect(() => {
@@ -1093,6 +1148,44 @@ ${trade.result === 'WIN'
           </div>
         )}
       </div>
+
+      {/* Performance do Narrador IA */}
+      <Card className="bg-gradient-to-r from-purple-900/50 to-pink-900/50 border-purple-500/30">
+        <CardHeader>
+          <CardTitle className="text-white text-lg flex items-center gap-2">
+            <Target className="h-5 w-5 text-purple-400" />
+            Performance de Sinais do Narrador IA
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="text-center p-3 rounded-lg bg-slate-800/50">
+              <div className="text-2xl font-bold text-blue-400">{narratorStats.totalSignals}</div>
+              <div className="text-xs text-gray-400">Total Sinais</div>
+            </div>
+            <div className="text-center p-3 rounded-lg bg-slate-800/50">
+              <div className="text-2xl font-bold text-green-400">{narratorStats.wins}</div>
+              <div className="text-xs text-gray-400">Vitórias</div>
+            </div>
+            <div className="text-center p-3 rounded-lg bg-slate-800/50">
+              <div className="text-2xl font-bold text-red-400">{narratorStats.losses}</div>
+              <div className="text-xs text-gray-400">Perdas</div>
+            </div>
+            <div className="text-center p-3 rounded-lg bg-slate-800/50">
+              <div className="text-2xl font-bold text-purple-400">{narratorStats.winRate.toFixed(1)}%</div>
+              <div className="text-xs text-gray-400">Win Rate</div>
+            </div>
+            <div className="text-center p-3 rounded-lg bg-slate-800/50">
+              <div className="text-2xl font-bold text-cyan-400">{narratorStats.validatedSignals}</div>
+              <div className="text-xs text-gray-400">Validados</div>
+            </div>
+            <div className="text-center p-3 rounded-lg bg-slate-800/50">
+              <div className="text-2xl font-bold text-yellow-400">{narratorStats.avgVariation.toFixed(2)}%</div>
+              <div className="text-xs text-gray-400">Variação Média</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Estatísticas e Chat */}
       <div className="grid grid-cols-2 gap-6">
