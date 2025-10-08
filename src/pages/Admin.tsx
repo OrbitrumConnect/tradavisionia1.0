@@ -15,6 +15,8 @@ import { AdminBuilder } from '@/components/admin/AdminBuilder';
 import { IntegratedThreeChats } from '@/components/admin/IntegratedThreeChats';
 import { RealLearningSystem } from '@/components/admin/RealLearningSystem';
 import { AgentAnalysis } from '@/components/admin/AgentAnalysis';
+import { SignalPerformance } from '@/components/analytics/SignalPerformance';
+import { AITrading } from '@/components/admin/AITrading';
 import { useMultiExchangeData } from '@/hooks/useMultiExchangeData';
 import { useTechnicalIndicators } from '@/hooks/useTechnicalIndicators';
 import { usePatternDetection } from '@/hooks/usePatternDetection';
@@ -25,7 +27,7 @@ const Admin = () => {
   const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminLoading, setAdminLoading] = useState(true);
-  const [activeView, setActiveView] = useState<'dashboard' | 'chat' | 'knowledge' | 'analytics' | 'builder' | 'threechats' | 'learning' | 'agentanalysis'>('dashboard');
+  const [activeView, setActiveView] = useState<'dashboard' | 'chat' | 'knowledge' | 'analytics' | 'builder' | 'threechats' | 'learning' | 'agentanalysis' | 'performance' | 'aitrading'>('dashboard');
   const [isChatsSidebarOpen, setIsChatsSidebarOpen] = useState(false);
   const [selectedSymbol, setSelectedSymbol] = useState('BTC/USDT');
   const [selectedTimeframe, setSelectedTimeframe] = useState('3m');
@@ -132,6 +134,8 @@ const Admin = () => {
             {activeView === 'builder' && <AdminBuilder />}
             {activeView === 'threechats' && <IntegratedThreeChats symbol={selectedSymbol} />}
             {activeView === 'learning' && <RealLearningSystem />}
+            {activeView === 'performance' && <SignalPerformance />}
+            {activeView === 'aitrading' && <AITrading symbol={selectedSymbol} />}
           </main>
         </div>
       </div>

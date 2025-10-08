@@ -344,6 +344,132 @@ class TradeVisionAI {
   }
 
 
+  // NOVO: Função para buscar trades históricos do usuário
+  async getRecentTrades(userId: string, limit: number = 10): Promise<any[]> {
+    try {
+      const { data, error } = await this.supabase
+        .from('ai_trades')
+        .select('*')
+        .eq('user_id', userId)
+        .order('timestamp', { ascending: false })
+        .limit(limit);
+
+      if (error) {
+        console.error('❌ Erro ao buscar trades:', error);
+        return [];
+      }
+
+      console.log('📊 Trades históricos encontrados:', data?.length || 0);
+      return data || [];
+    } catch (error) {
+      console.error('❌ Erro ao buscar trades:', error);
+      return [];
+    }
+  }
+
+  // NOVO: Função para analisar performance dos trades
+  async analyzeTradePerformance(trades: any[]): Promise<{
+    winRate: number;
+    avgPnL: number;
+    bestPatterns: string[];
+    worstPatterns: string[];
+    recommendations: string[];
+  }> {
+    if (trades.length === 0) {
+      return {
+        winRate: 0,
+        avgPnL: 0,
+        bestPatterns: [],
+        worstPatterns: [],
+        recommendations: ['Aguardando mais dados para análise']
+      };
+    }
+
+    const closedTrades = trades.filter(t => t.status === 'CLOSED' && t.result);
+    const totalTrades = closedTrades.length;
+    
+    if (totalTrades === 0) {
+      return {
+        winRate: 0,
+        avgPnL: 0,
+        bestPatterns: [],
+        worstPatterns: [],
+        recommendations: ['Aguardando trades fechados para análise']
+      };
+    }
+
+    const wins = closedTrades.filter(t => t.result === 'WIN').length;
+    const winRate = (wins / totalTrades) * 100;
+    
+    const totalPnL = closedTrades.reduce((sum, t) => sum + (parseFloat(t.pnl) || 0), 0);
+    const avgPnL = totalPnL / totalTrades;
+
+    // Analisar padrões técnicos
+    const patternStats: { [key: string]: { wins: number; total: number } } = {};
+    
+    closedTrades.forEach(trade => {
+      if (trade.technical_context) {
+        try {
+          const context = JSON.parse(trade.technical_context);
+          const patterns = Object.keys(context.patterns || {}).filter(p => context.patterns[p]);
+          
+          patterns.forEach(pattern => {
+            if (!patternStats[pattern]) {
+              patternStats[pattern] = { wins: 0, total: 0 };
+            }
+            patternStats[pattern].total++;
+            if (trade.result === 'WIN') {
+              patternStats[pattern].wins++;
+            }
+          });
+        } catch (e) {
+          // Ignorar trades com contexto inválido
+        }
+      }
+    });
+
+    const bestPatterns = Object.entries(patternStats)
+      .filter(([_, stats]) => stats.total >= 3)
+      .sort(([_, a], [__, b]) => (b.wins / b.total) - (a.wins / a.total))
+      .slice(0, 3)
+      .map(([pattern, _]) => pattern);
+
+    const worstPatterns = Object.entries(patternStats)
+      .filter(([_, stats]) => stats.total >= 3)
+      .sort(([_, a], [__, b]) => (a.wins / a.total) - (b.wins / b.total))
+      .slice(0, 3)
+      .map(([pattern, _]) => pattern);
+
+    // Gerar recomendações
+    const recommendations: string[] = [];
+    
+    if (winRate >= 70) {
+      recommendations.push('Excelente performance! Continue com a estratégia atual.');
+    } else if (winRate >= 60) {
+      recommendations.push('Boa performance. Considere ajustar stop loss para melhorar.');
+    } else if (winRate >= 50) {
+      recommendations.push('Performance moderada. Revise os padrões que mais falham.');
+    } else {
+      recommendations.push('Performance baixa. Considere mudar a estratégia.');
+    }
+
+    if (bestPatterns.length > 0) {
+      recommendations.push(`Foque nos padrões: ${bestPatterns.join(', ')}`);
+    }
+
+    if (worstPatterns.length > 0) {
+      recommendations.push(`Evite ou ajuste: ${worstPatterns.join(', ')}`);
+    }
+
+    return {
+      winRate,
+      avgPnL,
+      bestPatterns,
+      worstPatterns,
+      recommendations
+    };
+  }
+
   // NOVO: Função para lidar com consultas do Narrador
   async handleNarratorConsultation(message: string, realTimeContext: any, userId: string) {
     try {
@@ -607,6 +733,10 @@ class TradeVisionAI {
     
     if (LOVABLE_API_KEY) {
       try {
+        // Buscar trades históricos do usuário
+        const tradesHistory = await this.getRecentTrades(userId, 20);
+        const tradePerformance = await this.analyzeTradePerformance(tradesHistory);
+
         // Preparar contexto rico para o LLM COM MULTI-TIMEFRAME
         const contextForLLM = this.buildContextForLLM(
           message,
@@ -615,7 +745,9 @@ class TradeVisionAI {
           signals,
           scenarios || [],
           semanticContext,
-          multiTimeframeContext
+          multiTimeframeContext,
+          tradesHistory,
+          tradePerformance
         );
 
         const llmResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -787,7 +919,9 @@ Agora responda com maestria, elegância e precisão humana.`
     signals: any[],
     scenarios: any[],
     semanticContext: any[],
-    multiTimeframeContext?: any
+    multiTimeframeContext?: any,
+    tradesHistory?: any[],
+    tradePerformance?: any
   ): string {
     let context = `Pergunta do usuário: "${userMessage}"\n\n`;
 
@@ -836,6 +970,40 @@ Agora responda com maestria, elegância e precisão humana.`
       context += `\n---\n\n`;
     } else {
       context += `⏳ Sistema multi-timeframe ainda coletando dados iniciais...\n\n`;
+    }
+
+    // NOVO: Adicionar histórico de trades e performance
+    if (tradesHistory && tradesHistory.length > 0) {
+      context += `🤖 **HISTÓRICO DE TRADES AUTOMÁTICOS**\n`;
+      context += `Total de trades: ${tradesHistory.length}\n`;
+      
+      if (tradePerformance) {
+        context += `\n📈 **PERFORMANCE ATUAL:**\n`;
+        context += `- Win Rate: ${tradePerformance.winRate.toFixed(1)}%\n`;
+        context += `- P&L Médio: $${tradePerformance.avgPnL.toFixed(2)}\n`;
+        
+        if (tradePerformance.bestPatterns.length > 0) {
+          context += `- Melhores Padrões: ${tradePerformance.bestPatterns.join(', ')}\n`;
+        }
+        
+        if (tradePerformance.worstPatterns.length > 0) {
+          context += `- Padrões Problemáticos: ${tradePerformance.worstPatterns.join(', ')}\n`;
+        }
+        
+        context += `\n💡 **RECOMENDAÇÕES BASEADAS EM DADOS:**\n`;
+        tradePerformance.recommendations.forEach(rec => {
+          context += `- ${rec}\n`;
+        });
+      }
+      
+      context += `\n🕐 **ÚLTIMOS 5 TRADES:**\n`;
+      tradesHistory.slice(0, 5).forEach((trade, index) => {
+        const result = trade.result ? `(${trade.result})` : '(Aberto)';
+        const pnl = trade.pnl ? ` P&L: $${parseFloat(trade.pnl).toFixed(2)}` : '';
+        context += `${index + 1}. ${trade.trade_type} @ $${trade.entry_price} ${result}${pnl}\n`;
+      });
+      
+      context += `\n---\n\n`;
     }
 
     // Dados de mercado em tempo real

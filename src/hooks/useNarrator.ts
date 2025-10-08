@@ -149,6 +149,56 @@ export const useNarrator = (
     }
   };
 
+  // Função para ajustar probabilidade baseada em histórico
+  const adjustProbabilityBasedOnHistory = async (pattern: string, baseProbability: number): Promise<number> => {
+    try {
+      // Buscar histórico do padrão
+      const { data: history, error } = await supabase
+        .from('narrator_signals')
+        .select('result')
+        .eq('pattern', pattern)
+        .not('result', 'is', null)
+        .limit(20); // Últimos 20 sinais deste padrão
+
+      if (error || !history || history.length < 5) {
+        // Não tem histórico suficiente, usa probabilidade base
+        return baseProbability;
+      }
+
+      // Calcular win rate do padrão
+      const wins = history.filter(h => h.result === 'WIN').length;
+      const total = history.length;
+      const winRate = (wins / total) * 100;
+
+      console.log(`📊 Histórico do padrão "${pattern}": ${wins}/${total} (${winRate.toFixed(1)}%)`);
+
+      // Ajustar probabilidade baseado no win rate
+      let adjustedProbability = baseProbability;
+      
+      if (winRate >= 80) {
+        adjustedProbability += 10; // Padrão excelente
+      } else if (winRate >= 70) {
+        adjustedProbability += 5;  // Padrão bom
+      } else if (winRate >= 60) {
+        adjustedProbability += 2;  // Padrão ok
+      } else if (winRate < 40) {
+        adjustedProbability -= 15; // Padrão ruim
+      } else if (winRate < 50) {
+        adjustedProbability -= 10; // Padrão fraco
+      }
+
+      // Garantir que fica entre 30-95%
+      adjustedProbability = Math.max(30, Math.min(95, adjustedProbability));
+
+      console.log(`🎯 Probabilidade ajustada: ${baseProbability}% → ${adjustedProbability}%`);
+      
+      return adjustedProbability;
+    } catch (error) {
+      console.error('❌ Erro ao ajustar probabilidade:', error);
+      return baseProbability;
+    }
+  };
+
   const generateSignal = async () => {
     // Verificar se ainda está ativo antes de gerar
     if (!enabled || !isPlaying || !liveData || !user || !isRunningRef.current) {
@@ -272,13 +322,17 @@ export const useNarrator = (
         `M1: ${mtContext.m1?.trend || 'aguardando'} | M5: ${mtContext.m5?.trend || 'aguardando'} | M15: ${mtContext.m15?.trend || 'aguardando'} | M30: ${mtContext.m30?.trend || 'aguardando'}` :
         'Contexto multi-timeframe carregando...';
 
-      const signal: NarratorSignal = {
+        // 🎯 Ajustar probabilidade baseada em histórico
+        const baseProbability = agentValidation.confidence || data.signal.probability;
+        const adjustedProbability = await adjustProbabilityBasedOnHistory(data.signal.pattern, baseProbability);
+
+        const signal: NarratorSignal = {
         id: `signal-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         symbol: selectedPair,
         timeframe: selectedTimeframe,
         timestamp: new Date().toISOString(),
         type: data.signal.signal_type,
-        probability: agentValidation.confidence || data.signal.probability, // Usar confiança do Agente
+        probability: adjustedProbability, // 🎯 Probabilidade ajustada com histórico
         pattern: data.signal.pattern,
         figure: `${data.signal.figure} | Agente: ${agentValidation.reasoning.substring(0, 100)}... | ${mtContextText}`,
         risk: data.signal.risk_note,
