@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -304,12 +304,11 @@ export function AdminKnowledge() {
                              (page >= currentPage - 1 && page <= currentPage + 1);
                     })
                     .map((page, idx, arr) => (
-                      <>
+                      <React.Fragment key={page}>
                         {idx > 0 && arr[idx - 1] !== page - 1 && (
-                          <span key={`ellipsis-${page}`} className="px-2 text-muted-foreground">...</span>
+                          <span className="px-2 text-muted-foreground">...</span>
                         )}
                         <Button
-                          key={page}
                           variant={currentPage === page ? "default" : "outline"}
                           size="sm"
                           onClick={() => setCurrentPage(page)}
@@ -317,7 +316,7 @@ export function AdminKnowledge() {
                         >
                           {page}
                         </Button>
-                      </>
+                      </React.Fragment>
                     ))}
                 </div>
                 

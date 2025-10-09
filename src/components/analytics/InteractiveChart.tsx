@@ -283,7 +283,7 @@ export const InteractiveChart: React.FC<InteractiveChartProps> = ({
     const price = parseFloat(String(liveData.price).replace(/[,$]/g, ''));
     if (!Number.isFinite(price)) return;
     captureCursorData(price, 0);
-  }, [liveData, captureCursorData]);
+  }, [liveData]); // Removido captureCursorData para evitar loop infinito
 
   // Enviar para o feed do narrador periodicamente (ex: a cada 15s) se houver cursorData
   useEffect(() => {
