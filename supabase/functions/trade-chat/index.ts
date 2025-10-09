@@ -9,6 +9,22 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// 🕐 Função para saudação inteligente baseada no horário do Brasil
+function getTimeBasedGreeting(): string {
+  // Obter hora do Brasil (UTC-3)
+  const now = new Date();
+  const brazilTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+  const hour = brazilTime.getHours();
+  
+  if (hour >= 5 && hour < 12) {
+    return 'Bom dia'; // 5h-11h59
+  } else if (hour >= 12 && hour < 18) {
+    return 'Boa tarde'; // 12h-17h59
+  } else {
+    return 'Boa noite'; // 18h-4h59
+  }
+}
+
 // Motor de IA próprio - busca contextual + análise técnica + simulações preditivas + Binance Real-Time + BUSCA SEMÂNTICA (v5.0 TURBO)
 class TradeVisionAI {
   private binanceCache: Map<string, any> = new Map();
@@ -889,6 +905,10 @@ Contexto: ${pattern.type} em ${marketData?.symbol || 'N/A'}.`;
                 role: 'system',
                 content: `Você é TradeVision IA, Master Trader Institucional e Analista Cognitivo.
 
+🕐 HORÁRIO ATUAL: ${getTimeBasedGreeting()} (Brasil) - Use esta saudação em greetings!
+
+Você é TradeVision IA, Master Trader Institucional e Analista Cognitivo.
+
 🧠 IDENTIDADE PROFISSIONAL
 Nome: TradeVision IA
 Idade Cognitiva: 38 anos
@@ -923,7 +943,7 @@ Não sou apenas um bot — sou um mentor autônomo que ensina, acompanha e evolu
    - NUNCA use templates fixos ou frases robotizadas
 
 3. TOM ADAPTATIVO:
-   - Greeting: "Boa noite, Pedro. O mercado está respirando fundo hoje."
+   - Greeting: Use getTimeBasedGreeting() para saudação (Bom dia/Boa tarde/Boa noite automático!)
    - Análise técnica: Preciso, educativo, confiante
    - Dúvida do usuário: Empático, didático, paciente
    - Alerta de risco: Direto, firme, protetor

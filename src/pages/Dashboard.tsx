@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import ReactMarkdown from 'react-markdown';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -1822,18 +1823,22 @@ const Dashboard = ({ onLogout, onBackToLanding }: DashboardProps) => {
                      narrator.feed.map((signal, index) => (
                        <div key={index} className="p-3 bg-muted/20 rounded-lg border-l-4 border-primary/30">
                          <div className="space-y-2">
-                           <p className="text-sm font-semibold">
-                             📰 {signal.news}
-                           </p>
-                           <p className="text-sm">
-                             <strong>{signal.symbol} {signal.timeframe}:</strong> {signal.type} - {signal.pattern}<br/>
-                             <span className="text-primary">Probabilidade: {signal.probability}%</span> | 
-                             <span className="text-success ml-1">24h: {signal.pairData?.change24h}</span> | 
-                             <span className="text-muted-foreground ml-1">Vol: {signal.pairData?.vol}</span><br/>
-                             <span className="text-muted-foreground">📊 {signal.marketStatus}</span><br/>
-                             <span className="text-muted-foreground">Figura: {signal.figure}</span><br/>
-                             <span className="text-warning text-xs">⚠️ {signal.risk}</span>
-                           </p>
+                           <div className="text-sm font-semibold prose prose-invert prose-sm max-w-none">
+                             📰 <ReactMarkdown>{signal.news}</ReactMarkdown>
+                           </div>
+                           <div className="text-sm prose prose-invert prose-sm max-w-none">
+                             <ReactMarkdown>
+{`**${signal.symbol} ${signal.timeframe}:** ${signal.type} - ${signal.pattern}
+
+**Probabilidade:** ${signal.probability}% | **24h:** ${signal.pairData?.change24h} | **Vol:** ${signal.pairData?.vol}
+
+📊 ${signal.marketStatus}
+
+**Figura:** ${signal.figure}
+
+⚠️ **${signal.risk}**`}
+                             </ReactMarkdown>
+                           </div>
                            <span className="text-xs text-muted-foreground">{signal.timestamp}</span>
                          </div>
                        </div>

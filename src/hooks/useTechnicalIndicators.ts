@@ -13,7 +13,9 @@ export interface TechnicalIndicators {
   // EMAs
   ema9: number;
   ema20: number;
+  ema21: number;
   ema50: number;
+  ema100: number;
   ema200: number;
   
   // MACD
@@ -192,7 +194,9 @@ function calculateIndicators(candles: Candle[]): TechnicalIndicators {
   
   const ema9 = calculateEMA(closes, 9);
   const ema20 = calculateEMA(closes, 20);
+  const ema21 = calculateEMA(closes, 21);
   const ema50 = calculateEMA(closes, 50);
+  const ema100 = calculateEMA(closes, 100);
   const ema200 = calculateEMA(closes, 200);
   
   const { macd, signal, histogram } = calculateMACD(closes);
@@ -215,7 +219,9 @@ function calculateIndicators(candles: Candle[]): TechnicalIndicators {
   return {
     ema9,
     ema20,
+    ema21,
     ema50,
+    ema100,
     ema200,
     macd,
     macdSignal: signal,

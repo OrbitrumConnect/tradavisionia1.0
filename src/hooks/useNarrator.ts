@@ -265,80 +265,69 @@ export const useNarrator = (
         }
         return;
       }
+      
+      // 🎯 EXTRAIR DIREÇÃO DO AGENTE (Sistema Adaptativo!)
+      const agentDirection = agentValidation.agentResponse?.direction || 
+                           (agentValidation.reasoning?.includes('BULL') || agentValidation.reasoning?.includes('COMPRA') || agentValidation.reasoning?.includes('LONG') ? 'BUY' :
+                            agentValidation.reasoning?.includes('BEAR') || agentValidation.reasoning?.includes('VENDA') || agentValidation.reasoning?.includes('SHORT') ? 'SELL' :
+                            null);
+      
+      console.log('🎯 Direção detectada do Agente:', agentDirection);
 
       // Buscar notícia real da API
       const latestNews = await fetchLatestNews(selectedPair);
 
-      const marketData = {
-        symbol: selectedPair,
-        timeframe: selectedTimeframe,
-        price: liveData?.price || '0',
-        volume: liveData?.volume,
-        news: latestNews
-      };
-
-      // Chamar edge function de análise inteligente
-      const { data, error } = await supabase.functions.invoke('intelligent-narrator', {
-        body: {
-          pattern,
-          marketData,
-          technicalIndicators,
-          userId: user.id
+      // 🎯 USAR DIREÇÃO DO AGENTE ADAPTATIVO (não chama intelligent-narrator)
+      // Se Agente não sugeriu direção, inferir do padrão
+      let finalDirection = agentDirection;
+      
+      if (!finalDirection) {
+        // Inferir direção baseado no padrão detectado
+        if (detectedPatterns.orderBlockType === 'bullish' || detectedPatterns.fvgType === 'bullish' || detectedPatterns.springDetected) {
+          finalDirection = 'BUY';
+        } else if (detectedPatterns.orderBlockType === 'bearish' || detectedPatterns.fvgType === 'bearish' || detectedPatterns.upthrustDetected) {
+          finalDirection = 'SELL';
+        } else if (technicalIndicators?.rsi14 > 55) {
+          finalDirection = 'BUY';
+        } else if (technicalIndicators?.rsi14 < 45) {
+          finalDirection = 'SELL';
+        } else {
+          // Último recurso: usar MACD
+          finalDirection = (technicalIndicators?.macdHistogram || 0) > 0 ? 'BUY' : 'SELL';
         }
-      });
-
-      if (error) {
-        console.error('❌ Erro na análise:', error);
-        return; // SEM fallback - aguardar próximo ciclo
       }
-
-      if (!data.success) {
-        console.log('⚠️ Sinal descartado pela TradeVision IA:', data.reason);
-        
-        // Notificar usuário sobre descarte inteligente
-        if (speakEnabled && enabled && isPlaying) {
-          const utterance = new SpeechSynthesisUtterance(
-            `Sinal descartado. ${data.aiValidation || 'Score abaixo do mínimo aceitável.'}`
-          );
-          utterance.lang = 'pt-BR';
-          utterance.rate = 0.85;
-          utterance.pitch = 0.9;
-          speechSynthesis.speak(utterance);
-        }
-        return; // SEM fallback fictício
-      }
-
+      
+      console.log('🎯 Direção final do sinal:', finalDirection);
+      
       const analysisEndTime = Date.now();
       const totalAnalysisTime = analysisEndTime - detectedAt;
-      console.log(`✅ Sinal VALIDADO pela TradeVision IA em ${totalAnalysisTime}ms!`, data.aiValidation);
+      console.log(`✅ Sinal VALIDADO pelo Agente Adaptativo em ${totalAnalysisTime}ms!`);
 
-      // Adicionar ao feed com validação IA
-      const timing = data.signal.metadata?.timing;
-      const aiValidation = data.signal.metadata?.tradevision_validation;
-      const mtContext = data.signal.metadata?.multi_timeframe_context;
+      // 🎯 Ajustar probabilidade baseada em histórico
+      const baseProbability = agentValidation.confidence || 75;
+      const patternDesc = `${pattern.type || 'Padrão'} (${finalDirection})`;
+      const adjustedProbability = await adjustProbabilityBasedOnHistory(patternDesc, baseProbability);
+
+      // Gerar figura técnica
+      const figure = `${pattern.type || 'Estrutura Técnica'} | RSI: ${technicalIndicators?.rsi14?.toFixed(1) || 'N/A'} | MACD: ${technicalIndicators?.macdHistogram?.toFixed(2) || 'N/A'} | Validação: Agente Adaptativo`;
       
-      // Contexto multi-timeframe para narração
-      const mtContextText = mtContext ? 
-        `M1: ${mtContext.m1?.trend || 'aguardando'} | M5: ${mtContext.m5?.trend || 'aguardando'} | M15: ${mtContext.m15?.trend || 'aguardando'} | M30: ${mtContext.m30?.trend || 'aguardando'}` :
-        'Contexto multi-timeframe carregando...';
+      // Risk note baseado em volatilidade
+      const riskLevel = technicalIndicators?.atr > 100 ? 'Alto' : 
+                       technicalIndicators?.atr > 50 ? 'Médio' : 'Baixo';
 
-        // 🎯 Ajustar probabilidade baseada em histórico
-        const baseProbability = agentValidation.confidence || data.signal.probability;
-        const adjustedProbability = await adjustProbabilityBasedOnHistory(data.signal.pattern, baseProbability);
-
-        const signal: NarratorSignal = {
+      const signal: NarratorSignal = {
         id: `signal-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         symbol: selectedPair,
         timeframe: selectedTimeframe,
         timestamp: new Date().toISOString(),
-        type: data.signal.signal_type,
-        probability: adjustedProbability, // 🎯 Probabilidade ajustada com histórico
-        pattern: data.signal.pattern,
-        figure: `${data.signal.figure} | Agente: ${agentValidation.reasoning.substring(0, 100)}... | ${mtContextText}`,
-        risk: data.signal.risk_note,
-        price: data.signal.price,
-        news: data.signal.news || '',
-        marketStatus: `${data.signal.market_status} | Agente Validado: ${agentValidation.confidence}% | IA: ${aiValidation?.recommendation || 'VALIDADO'} | ${totalAnalysisTime}ms`,
+        type: finalDirection as 'BUY' | 'SELL', // 🎯 Direção do Agente Adaptativo!
+        probability: adjustedProbability,
+        pattern: patternDesc,
+        figure,
+        risk: `Risco ${riskLevel} | Volatilidade: ${technicalIndicators?.atr?.toFixed(2) || 'N/A'}`,
+        price: liveData?.price || '0',
+        news: latestNews,
+        marketStatus: `Validado pelo Agente Adaptativo | Confiança: ${agentValidation.confidence}% | Tempo: ${totalAnalysisTime}ms`,
         pairData: pairInfo[selectedPair as keyof typeof pairInfo] || pairInfo['BTC/USDT']
       };
 
@@ -346,35 +335,39 @@ export const useNarrator = (
       
       // Adicionar sinal ao contexto compartilhado para o Sistema 3 IAs
       addNarratorSignal(signal);
+      
+      // 💾 Salvar no banco de dados
+      await supabase.from('narrator_signals').insert({
+        user_id: user.id,
+        symbol: selectedPair,
+        timeframe: selectedTimeframe,
+        signal_type: finalDirection,
+        pattern: patternDesc,
+        probability: adjustedProbability,
+        price: liveData?.price || '0',
+        risk_note: signal.risk,
+        metadata: {
+          figure,
+          news: latestNews,
+          agent_validation: agentValidation,
+          technical_indicators: technicalIndicators,
+          detected_patterns: detectedPatterns,
+          analysis_time_ms: totalAnalysisTime
+        }
+      });
 
-      // Voice synthesis ENRIQUECIDA com validação IA + contexto multi-timeframe
-      // Verificar se ainda está ativo antes de falar
+      // Voice synthesis com direção clara
       if (speakEnabled && enabled && isPlaying && isRunningRef.current) {
-        const urgency = aiValidation?.recommendation === 'STRONG_BUY' ? 'ALTA URGÊNCIA' :
-                       aiValidation?.recommendation === 'BUY' ? 'Oportunidade forte' :
+        const urgency = adjustedProbability >= 85 ? 'ALTA CONFIANÇA' :
+                       adjustedProbability >= 75 ? 'Oportunidade forte' :
                        'Oportunidade detectada';
         
-        const aiInsight = aiValidation?.keyPoints?.[0] || data.signal.figure;
-        
-        // Adicionar contexto de timeframes maiores na narração
-        let mtSpeech = '';
-        if (mtContext) {
-          const higherTFs = [];
-          if (mtContext.m5?.trend && mtContext.m5.trend !== 'neutral') higherTFs.push(`M5 ${mtContext.m5.trend}`);
-          if (mtContext.m15?.trend && mtContext.m15.trend !== 'neutral') higherTFs.push(`M15 ${mtContext.m15.trend}`);
-          if (mtContext.m30?.trend && mtContext.m30.trend !== 'neutral') higherTFs.push(`M30 ${mtContext.m30.trend}`);
-          
-          if (higherTFs.length > 0) {
-            mtSpeech = ` Contexto superior: ${higherTFs.join(', ')}.`;
-          }
-        }
-        
         const utterance = new SpeechSynthesisUtterance(
-          `${urgency}! ${selectedPair}: ${data.signal.signal_type} validado pela TradeVision IA com ${data.signal.probability}% de confiança. ${aiInsight}.${mtSpeech} ${aiValidation?.reasoning || 'Análise completa disponível.'}`
+          `${urgency}! ${selectedPair}: ${finalDirection} validado com ${adjustedProbability}% de confiança. ${patternDesc} detectado a $${liveData?.price}. ${agentValidation.reasoning?.substring(0, 100) || 'Análise completa disponível'}.`
         );
         utterance.lang = 'pt-BR';
         utterance.rate = 0.9;
-        utterance.pitch = aiValidation?.recommendation?.includes('STRONG') ? 1.2 : 1.0;
+        utterance.pitch = adjustedProbability >= 85 ? 1.2 : 1.0;
         speechSynthesis.speak(utterance);
       }
 
