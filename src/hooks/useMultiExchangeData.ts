@@ -321,32 +321,34 @@ export const useMultiExchangeData = (exchange: string = 'binance', pair: string 
         
         setLastUpdateTime(Date.now());
 
-        if (kline.x) {
-          setCandles(prev => {
-            const newCandles = [...prev];
-            const newCandle = {
-              time: kline.t,
-              open: parseFloat(kline.o),
-              high: parseFloat(kline.h),
-              low: parseFloat(kline.l),
-              close: parseFloat(kline.c),
-              volume: parseFloat(kline.v)
-            };
-            
-            const lastCandle = newCandles[newCandles.length - 1];
-            
-            if (lastCandle && lastCandle.time === newCandle.time) {
-              newCandles[newCandles.length - 1] = newCandle;
-            } else {
-              newCandles.push(newCandle);
-              if (newCandles.length > 500) {
-                newCandles.shift();
-              }
+        // 🔥 ATUALIZAR CANDLES EM TEMPO REAL (não esperar fechar!)
+        setCandles(prev => {
+          const newCandles = [...prev];
+          const newCandle = {
+            time: kline.t,
+            open: parseFloat(kline.o),
+            high: parseFloat(kline.h),
+            low: parseFloat(kline.l),
+            close: parseFloat(kline.c), // Preço atual (em formação)
+            volume: parseFloat(kline.v)
+          };
+          
+          const lastCandle = newCandles[newCandles.length - 1];
+          
+          // Se mesma vela: atualiza (TEMPO REAL!)
+          // Se vela nova (kline.x = true): adiciona
+          if (lastCandle && lastCandle.time === newCandle.time) {
+            newCandles[newCandles.length - 1] = newCandle; // Atualiza em tempo real!
+          } else if (kline.x) {
+            // Só adiciona vela NOVA quando fechar
+            newCandles.push(newCandle);
+            if (newCandles.length > 500) {
+              newCandles.shift();
             }
-            
-            return newCandles;
-          });
-        }
+          }
+          
+          return newCandles;
+        });
       } catch (error) {
         console.error('Error processing WebSocket data:', error);
       }

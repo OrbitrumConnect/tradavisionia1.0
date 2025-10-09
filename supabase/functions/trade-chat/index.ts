@@ -470,6 +470,101 @@ class TradeVisionAI {
     };
   }
 
+  // 🧠 SISTEMA ADAPTATIVO: Detecta contexto e ajusta perfil automaticamente
+  detectMarketContext(indicators: any, marketData: any, pattern: any) {
+    let baseConfidence = 50;
+    let aggressiveness = 'balanced'; // conservative | balanced | aggressive
+    let threshold = 65;
+    let profile = 'ADAPTATIVO';
+    
+    // 🔥 ANÁLISE MULTI-FATOR
+    let signalStrength = 0;
+    
+    // 1. VOLUME (peso: 30%)
+    const volumeScore = marketData?.volume || 0;
+    if (volumeScore > 1.5) {
+      signalStrength += 30; // Volume alto = mercado ativo
+      baseConfidence += 10;
+      profile = 'AGRESSIVO';
+    } else if (volumeScore > 0.8) {
+      signalStrength += 15; // Volume normal
+      baseConfidence += 5;
+    } else {
+      signalStrength += 5; // Volume baixo
+    }
+    
+    // 2. VOLATILIDADE (peso: 25%)
+    const volatility = Math.abs(indicators?.RSI - 50) || 0;
+    if (volatility > 20) {
+      signalStrength += 25; // Alta volatilidade = oportunidades
+      baseConfidence += 8;
+      aggressiveness = 'aggressive';
+    } else if (volatility > 10) {
+      signalStrength += 12; // Volatilidade média
+      baseConfidence += 4;
+    } else {
+      signalStrength += 3; // Baixa volatilidade
+    }
+    
+    // 3. MOMENTUM (peso: 25%)
+    const macdStrength = Math.abs(indicators?.MACD?.histogram || 0);
+    if (macdStrength > 50) {
+      signalStrength += 25; // Momentum forte
+      baseConfidence += 10;
+      profile = 'AGRESSIVO';
+    } else if (macdStrength > 20) {
+      signalStrength += 12; // Momentum médio
+      baseConfidence += 5;
+    } else {
+      signalStrength += 5; // Momentum fraco
+    }
+    
+    // 4. QUALIDADE DO PADRÃO (peso: 20%)
+    const patternQuality = this.evaluatePatternQuality(pattern);
+    signalStrength += patternQuality.score;
+    baseConfidence += patternQuality.bonus;
+    
+    // 🎯 AJUSTE DINÂMICO DE THRESHOLD
+    if (signalStrength >= 70) {
+      threshold = 55; // Mercado forte = menos exigente
+      aggressiveness = 'aggressive';
+      profile = 'AGRESSIVO';
+    } else if (signalStrength >= 50) {
+      threshold = 60; // Mercado normal = balanceado
+      aggressiveness = 'balanced';
+      profile = 'BALANCEADO';
+    } else {
+      threshold = 70; // Mercado fraco = mais exigente
+      aggressiveness = 'conservative';
+      profile = 'CONSERVADOR';
+    }
+    
+    return {
+      baseConfidence: Math.min(baseConfidence, 75), // Cap em 75
+      threshold,
+      aggressiveness,
+      signalStrength,
+      profile,
+      reasoning: `Mercado ${signalStrength >= 70 ? 'forte' : signalStrength >= 50 ? 'normal' : 'fraco'} - Perfil ${profile}`
+    };
+  }
+  
+  // Avaliar qualidade do padrão
+  evaluatePatternQuality(pattern: any) {
+    const qualityMap = {
+      'Order Block': { score: 20, bonus: 15, description: 'Alta confiabilidade' },
+      'CHOCH': { score: 20, bonus: 20, description: 'Reversão forte' },
+      'BOS': { score: 18, bonus: 15, description: 'Continuação confirmada' },
+      'FVG': { score: 15, bonus: 12, description: 'Zona de liquidez' },
+      'Spring': { score: 18, bonus: 15, description: 'Wyckoff válido' },
+      'Upthrust': { score: 18, bonus: 15, description: 'Wyckoff válido' },
+      'Liquidity Sweep': { score: 15, bonus: 12, description: 'Varrida detectada' },
+      'default': { score: 10, bonus: 8, description: 'Padrão técnico' }
+    };
+    
+    return qualityMap[pattern.type] || qualityMap['default'];
+  }
+
   // NOVO: Função para lidar com consultas do Narrador
   async handleNarratorConsultation(message: string, realTimeContext: any, userId: string) {
     try {
@@ -479,12 +574,16 @@ class TradeVisionAI {
       
       console.log('🧠 Analisando padrão do Narrador:', pattern.type);
       
+      // 🧠 SISTEMA ADAPTATIVO: Detectar contexto do mercado
+      const marketContext = this.detectMarketContext(indicators, marketData, pattern);
+      console.log('🎯 Contexto detectado:', marketContext);
+      
       // Análise técnica do padrão
       let analysis = '';
       let recommendation = 'WAIT';
-      let confidence = 50;
+      let confidence = marketContext.baseConfidence; // Dinâmico baseado em contexto!
       
-      // Analisar RSI
+      // Analisar RSI (Sistema Adaptativo)
       if (indicators?.RSI) {
         if (indicators.RSI < 30) {
           analysis += 'RSI em sobrevenda (30), indicando possível reversão. ';
@@ -492,19 +591,36 @@ class TradeVisionAI {
         } else if (indicators.RSI > 70) {
           analysis += 'RSI em sobrecompra (70), indicando possível reversão. ';
           confidence += 15;
-        } else {
-          analysis += 'RSI neutro, aguardando confirmação. ';
+        } else if (indicators.RSI >= 40 && indicators.RSI <= 60) {
+          analysis += 'RSI em zona saudável (equilíbrio). ';
+          confidence += 8; // Zona neutra é BOM!
+        } else if (indicators.RSI > 60 && indicators.RSI <= 70) {
+          analysis += 'RSI indicando força compradora. ';
+          confidence += 10;
+        } else if (indicators.RSI >= 30 && indicators.RSI < 40) {
+          analysis += 'RSI indicando força vendedora. ';
+          confidence += 10;
         }
       }
       
-      // Analisar MACD
+      // Analisar MACD (Sistema Adaptativo)
       if (indicators?.MACD) {
-        if (indicators.MACD.histogram > 0) {
+        const macdHist = indicators.MACD.histogram || 0;
+        if (macdHist > 50) {
+          analysis += 'MACD muito positivo, momentum forte de alta. ';
+          confidence += 15;
+        } else if (macdHist > 0) {
           analysis += 'MACD positivo, momentum de alta. ';
           confidence += 10;
-        } else if (indicators.MACD.histogram < 0) {
+        } else if (macdHist < -50) {
+          analysis += 'MACD muito negativo, momentum forte de baixa. ';
+          confidence += 15;
+        } else if (macdHist < 0) {
           analysis += 'MACD negativo, momentum de baixa. ';
           confidence += 10;
+        } else {
+          analysis += 'MACD neutro, sem direção clara. ';
+          confidence += 3; // Neutro soma algo!
         }
       }
       
@@ -531,8 +647,9 @@ class TradeVisionAI {
           recommendation = 'GENERATE_SIGNAL';
           break;
         default:
-          analysis += 'Padrão técnico detectado, mas aguardando confirmação. ';
-          confidence += 5;
+          analysis += 'Padrão técnico detectado, analisando contexto. ';
+          confidence += marketContext.aggressiveness === 'aggressive' ? 15 : 
+                       marketContext.aggressiveness === 'balanced' ? 10 : 5;
       }
       
       // Verificar contexto de preço
@@ -543,18 +660,27 @@ class TradeVisionAI {
         }
       }
       
-      // Decisão final
-      const finalRecommendation = confidence >= 70 ? 'GENERATE_SIGNAL' : 'WAIT';
+      // 🎯 DECISÃO FINAL ADAPTATIVA (usa threshold dinâmico!)
+      const finalRecommendation = confidence >= marketContext.threshold ? 'GENERATE_SIGNAL' : 'WAIT';
       const finalConfidence = Math.min(confidence, 95);
       
-      console.log('🧠 Decisão final do Agente:', {
+      console.log('🧠 Decisão final do Agente (ADAPTATIVA):', {
         confidence,
         finalConfidence,
+        threshold: marketContext.threshold,
+        profile: marketContext.profile,
+        signalStrength: marketContext.signalStrength,
         finalRecommendation,
         pattern: pattern.type
       });
       
-      const response = `🧠 ANÁLISE DO AGENTE: ${analysis}${finalRecommendation === 'GENERATE_SIGNAL' ? 'RECOMENDO: Gerar sinal com ' + finalConfidence + '% de confiança.' : 'AGUARDAR: Confiança insuficiente (' + finalConfidence + '%).'} Contexto: ${pattern.type} em ${marketData?.symbol || 'N/A'}.`;
+      const response = `🧠 ANÁLISE DO AGENTE [${marketContext.profile}]: ${analysis}
+
+${finalRecommendation === 'GENERATE_SIGNAL' 
+  ? `✅ RECOMENDO: Gerar sinal com ${finalConfidence}% de confiança (threshold: ${marketContext.threshold}%).` 
+  : `⏸️ AGUARDAR: Confiança ${finalConfidence}% < threshold ${marketContext.threshold}% (${marketContext.reasoning}).`}
+
+Contexto: ${pattern.type} em ${marketData?.symbol || 'N/A'}.`;
       
       return {
         response,
