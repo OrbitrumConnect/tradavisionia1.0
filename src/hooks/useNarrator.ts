@@ -401,11 +401,11 @@ export const useNarrator = (
       generateSignal();
     }, 1000);
     
-    // Continuar gerando sinais a cada 1 minuto
+    // Continuar gerando sinais a cada 30 segundos
     intervalRef.current = setInterval(() => {
       console.log('⏰ Interval executado - tentando gerar sinal...');
       generateSignal();
-    }, 60000);
+    }, 30000);
   };
 
   const stopNarrator = () => {

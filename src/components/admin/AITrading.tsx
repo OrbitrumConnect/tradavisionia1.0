@@ -376,16 +376,16 @@ Se BUY ou SELL, explique o motivo técnico em 1 linha.
         sendMessageToAI(`🚀 TRADE AUTOMÁTICO EXECUTADO: SELL @ $${currentPrice.toFixed(2)} - ${reason}`, true);
       } else {
         // HOLD ou análise negativa
-        sendMessageToAI(`⏳ AUTO: ${response} - Aguardando próximo ciclo (1min)`, true);
+        sendMessageToAI(`⏳ AUTO: ${response} - Aguardando próximo ciclo (3min)`, true);
       }
 
       // Atualizar próximo trade
-      const nextTime = new Date(Date.now() + 60000); // 1 minuto
+      const nextTime = new Date(Date.now() + 180000); // 3 minutos
       setNextTradeTime(nextTime);
 
     } catch (error) {
       console.error('❌ Erro na análise automática:', error);
-      sendMessageToAI('❌ Erro na análise automática. Tentando novamente em 1 minuto...', true);
+        sendMessageToAI('❌ Erro na análise automática. Tentando novamente em 3 minutos...', true);
     }
   };
 
@@ -544,14 +544,24 @@ ${trade.result === 'WIN'
   const checkPositionExit = (currentPrice: number) => {
     if (!currentPosition) return;
 
-    const { type, entryPrice, stopLoss, takeProfit, size, leverage } = currentPosition;
+    const { type, entryPrice, stopLoss, takeProfit, size, leverage, timestamp } = currentPosition;
 
     let shouldClose = false;
     let result: 'WIN' | 'LOSS' = 'WIN';
     let exitReason = '';
 
+    // 🕐 PRIORIDADE 1: FECHAR APÓS 3 MINUTOS (INDEPENDENTE DE SL/TP)
+    const tradeAge = Date.now() - new Date(timestamp).getTime();
+    const threeMinutes = 180000; // 3 minutos
+    
+    if (tradeAge >= threeMinutes) {
+      shouldClose = true;
+      const priceDiff = type === 'BUY' ? currentPrice - entryPrice : entryPrice - currentPrice;
+      result = priceDiff > 0 ? 'WIN' : 'LOSS';
+      exitReason = '⏰ Fechamento automático após 3 minutos';
+    }
     // Verificar stop loss
-    if (type === 'BUY' && currentPrice <= stopLoss) {
+    else if (type === 'BUY' && currentPrice <= stopLoss) {
       shouldClose = true;
       result = 'LOSS';
       exitReason = 'Stop Loss acionado';
@@ -560,9 +570,8 @@ ${trade.result === 'WIN'
       result = 'LOSS';
       exitReason = 'Stop Loss acionado';
     }
-
     // Verificar take profit
-    if (type === 'BUY' && currentPrice >= takeProfit) {
+    else if (type === 'BUY' && currentPrice >= takeProfit) {
       shouldClose = true;
       result = 'WIN';
       exitReason = 'Take Profit atingido';
@@ -637,18 +646,18 @@ ${trade.result === 'WIN'
         analyzeAndTrade();
       }, 2000); // 2 segundos para carregar dados
 
-      // Analisar a cada 1 minuto (60 segundos) - TRADING AUTOMÁTICO
+      // Analisar a cada 3 minutos (180 segundos) - TRADING AUTOMÁTICO
       tradingIntervalRef.current = setInterval(() => {
         console.log('🤖 Executando análise automática...');
         analyzeAndTrade();
-      }, 60000);
+      }, 180000); // 3 minutos
 
       // Definir próximo trade
-      const nextTime = new Date(Date.now() + 60000);
+      const nextTime = new Date(Date.now() + 180000); // 3 minutos
       setNextTradeTime(nextTime);
 
-      sendMessageToAI(`🤖 TRADING 100% AUTOMÁTICO ATIVADO! TradeVision IA executando trades a cada 1 minuto. Próximo trade: ${nextTime.toLocaleTimeString('pt-BR')}`, true);
-      sendMessageToAI('🚀 Sistema configurado para executar BUY/SELL automaticamente baseado em análise técnica!', true);
+      sendMessageToAI(`🤖 TRADING 100% AUTOMÁTICO ATIVADO! TradeVision IA executando trades a cada 3 minutos. Próximo trade: ${nextTime.toLocaleTimeString('pt-BR')}`, true);
+      sendMessageToAI('🚀 Sistema configurado: Abre trade → Aguarda 3min → Fecha automático → Abre novo!', true);
     } else {
       if (tradingIntervalRef.current) {
         clearInterval(tradingIntervalRef.current);

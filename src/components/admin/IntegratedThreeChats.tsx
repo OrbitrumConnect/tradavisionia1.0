@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
+import ReactMarkdown from 'react-markdown';
 import { 
   MessageSquare, 
   Bot, 
@@ -633,9 +634,9 @@ export const IntegratedThreeChats = ({ symbol }: IntegratedThreeChatsProps) => {
                           )}
                     </div>
                         
-                        <div className="text-white text-sm leading-relaxed whitespace-pre-line mt-2">
-                          {message.content}
-                            </div>
+                        <div className="text-white text-sm leading-relaxed mt-2 prose prose-invert prose-sm max-w-none">
+                          <ReactMarkdown>{message.content}</ReactMarkdown>
+                        </div>
                         
                         {message.type !== 'agent' && message.metadata && Object.keys(message.metadata).length > 0 && (
                           <div className="mt-3 p-3 rounded-lg bg-slate-900/40 border border-slate-700">

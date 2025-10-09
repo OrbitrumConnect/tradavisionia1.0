@@ -251,7 +251,7 @@ const Dashboard = ({ onLogout, onBackToLanding }: DashboardProps) => {
 
   // Atualizar MarketContext em tempo real para o Agente IA
   useEffect(() => {
-    if (!liveData) return;
+    if (!liveData || candles.length < 10) return;
 
     // Calcular volatilidade (ATR simplificado)
     const volatility = candles.length >= 14 
@@ -285,7 +285,7 @@ const Dashboard = ({ onLogout, onBackToLanding }: DashboardProps) => {
       patterns,
       candles: candles.slice(-50), // Últimos 50 candles
     });
-  }, [liveData, selectedPair, selectedTimeframe, fearGreedIndex, buyerDominance, marketPressure, technicalIndicators, patterns, candles]);
+  }, [liveData?.price, selectedPair, selectedTimeframe, fearGreedIndex, buyerDominance, marketPressure]); // Removido candles, technicalIndicators, patterns para evitar loop
 
   // Salvar sinais do narrador no banco para o Admin Dashboard coletar (evitar duplicados)
   const [lastSavedSignal, setLastSavedSignal] = useState<string | null>(null);
