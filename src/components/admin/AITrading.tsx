@@ -21,7 +21,8 @@ import {
   Send,
   Bot,
   Play,
-  Pause
+  Pause,
+  RotateCcw
 } from 'lucide-react';
 
 interface Trade {
@@ -640,6 +641,51 @@ ${trade.result === 'WIN'
     }
   };
 
+  // 🆕 RESET TOTAL (limpar tudo, inclusive banco)
+  const resetEverything = async () => {
+    if (!confirm('⚠️ RESETAR TUDO?\n\nIsso vai:\n• Limpar todos os trades\n• Resetar saldo para $1000\n• Apagar histórico do banco\n\nContinuar?')) {
+      return;
+    }
+
+    try {
+      // Limpar trades do banco
+      if (user) {
+        const { error } = await (supabase as any)
+          .from('ai_trades')
+          .delete()
+          .eq('user_id', user.id);
+        
+        if (error) throw error;
+      }
+
+      // Resetar estados locais
+      setTrades([]);
+      setCurrentPosition(null);
+      setChatMessages([]);
+      setStats({
+        totalTrades: 0,
+        wins: 0,
+        losses: 0,
+        winRate: 0,
+        totalPnL: 0,
+        balance: 1000
+      });
+
+      sendMessageToAI('🔄 RESET TOTAL CONCLUÍDO! Tudo limpo, começando do zero com $1000.', true);
+      toast({ 
+        title: '✅ Reset Completo', 
+        description: 'Todos os dados foram limpos. Começando do zero!' 
+      });
+    } catch (error) {
+      console.error('❌ Erro ao resetar:', error);
+      toast({ 
+        title: '❌ Erro', 
+        description: 'Erro ao limpar dados do banco', 
+        variant: 'destructive' 
+      });
+    }
+  };
+
   // Verificar saída da posição
   const checkPositionExit = (currentPrice: number) => {
     if (!currentPosition) return;
@@ -692,12 +738,29 @@ ${trade.result === 'WIN'
 
     const { type, entryPrice, size, leverage } = currentPosition;
 
-    // Calcular P&L
+    // 🆕 CALCULAR P&L REALISTA (baseado em movimento percentual)
+    // Exemplo: BTC $121,400 → $121,450 = +0.041% × leverage × capital
     const priceChange = type === 'BUY' 
-      ? (exitPrice - entryPrice) / entryPrice
+      ? (exitPrice - entryPrice) / entryPrice  // % de variação
       : (entryPrice - exitPrice) / entryPrice;
-
-    const pnl = priceChange * size * exitPrice * leverage;
+    
+    // Capital investido = tamanho × preço de entrada
+    const investedCapital = size * entryPrice;
+    
+    // P&L = variação % × capital investido × leverage
+    // Exemplo: 0.041% × $100 × 10x = $4.10
+    const pnl = priceChange * investedCapital * leverage;
+    
+    console.log(`💰 P&L Calculado:`, {
+      type,
+      entryPrice,
+      exitPrice,
+      priceChange: (priceChange * 100).toFixed(3) + '%',
+      investedCapital: investedCapital.toFixed(2),
+      leverage,
+      pnl: pnl.toFixed(2),
+      result
+    });
 
     // Atualizar trade
     const closedTrade: Trade = {
@@ -825,6 +888,16 @@ ${trade.result === 'WIN'
           >
             {isTrading ? <Pause className="h-4 w-4 mr-2" /> : <Play className="h-4 w-4 mr-2" />}
             {isTrading ? 'Pausar Trading' : 'Iniciar Trading'}
+          </Button>
+
+          <Button
+            onClick={resetEverything}
+            variant="outline"
+            className="bg-orange-600/20 hover:bg-orange-600/30 border-orange-500/30 text-orange-400"
+            title="Limpar TODOS os trades e resetar saldo (inclusive banco de dados)"
+          >
+            <RotateCcw className="h-4 w-4 mr-2" />
+            Reset Total
           </Button>
           
           {isTrading && (
@@ -978,7 +1051,7 @@ ${trade.result === 'WIN'
         </div>
 
         {candles.length === 0 ? (
-          <div className="h-[500px] flex items-center justify-center bg-slate-800 rounded-lg border border-slate-700">
+          <div className="h-[600px] flex items-center justify-center bg-slate-800 rounded-lg border border-slate-700">
             <div className="text-center">
               <Activity className="h-12 w-12 mx-auto mb-4 text-blue-400 animate-pulse" />
               <p className="text-gray-200 font-semibold mb-2">Carregando gráfico em tempo real...</p>
@@ -1000,7 +1073,7 @@ ${trade.result === 'WIN'
             </div>
           </div>
         ) : (
-          <div className="h-[500px] bg-slate-900 rounded-lg border border-slate-700 p-4">
+          <div className="h-[600px] bg-slate-900 rounded-lg border border-slate-700 p-4">
             <div className="h-full flex flex-col">
               {/* Header do Gráfico */}
               <div className="flex items-center justify-between mb-4">
@@ -1036,7 +1109,7 @@ ${trade.result === 'WIN'
                       const priceRange = maxPrice - basePrice || 1;
                       
                       // Calculate positions based on price data - AJUSTE DINÂMICO
-                      const chartHeight = 280;
+                      const chartHeight = 360; // 🆕 Aumentado de 280 para 360 (+28%)
                       const wickTop = ((candle.high - basePrice) / priceRange) * chartHeight;
                       const wickBottom = ((candle.low - basePrice) / priceRange) * chartHeight;
                       const bodyTop = ((Math.max(candle.open, candle.close) - basePrice) / priceRange) * chartHeight;
@@ -1113,7 +1186,7 @@ ${trade.result === 'WIN'
                           const priceRange = maxPrice - basePrice || 1;
                           
                           const normalizedPosition = (currentPrice - basePrice) / priceRange;
-                          const chartHeight = 280;
+                          const chartHeight = 360;
                           const bottomOffset = 50;
                           
                           const realPosition = normalizedPosition * chartHeight + bottomOffset;
@@ -1152,7 +1225,7 @@ ${trade.result === 'WIN'
                             const priceRange = maxPrice - basePrice || 1;
                             
                             const normalizedPosition = (entryPrice - basePrice) / priceRange;
-                            const chartHeight = 280;
+                            const chartHeight = 360;
                             const bottomOffset = 50;
                             
                             const realPosition = normalizedPosition * chartHeight + bottomOffset;
@@ -1188,7 +1261,7 @@ ${trade.result === 'WIN'
                             const priceRange = maxPrice - basePrice || 1;
                             
                             const normalizedPosition = (takeProfitPrice - basePrice) / priceRange;
-                            const chartHeight = 280;
+                            const chartHeight = 360;
                             const bottomOffset = 50;
                             
                             const realPosition = normalizedPosition * chartHeight + bottomOffset;
@@ -1224,7 +1297,7 @@ ${trade.result === 'WIN'
                             const priceRange = maxPrice - basePrice || 1;
                             
                             const normalizedPosition = (stopLossPrice - basePrice) / priceRange;
-                            const chartHeight = 280;
+                            const chartHeight = 360;
                             const bottomOffset = 50;
                             
                             const realPosition = normalizedPosition * chartHeight + bottomOffset;
