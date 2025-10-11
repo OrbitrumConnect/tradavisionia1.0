@@ -1,6 +1,4 @@
-// @ts-ignore
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-// @ts-ignore
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
 const corsHeaders = {
@@ -14,8 +12,8 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = (globalThis as any).Deno?.env?.get('SUPABASE_URL') || 'https://krjpvdllsbxeuuncmitt.supabase.co';
-    const supabaseKey = (globalThis as any).Deno?.env?.get('SUPABASE_ANON_KEY') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtyanB2ZGxsc2J4ZXV1bmNtaXR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk1ODA0MzksImV4cCI6MjA3NTE1NjQzOX0.5pnSaFe5URJmfE_DdKCsInPsIBCbKsCZCQ-yzarIwDk';
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || 'https://krjpvdllsbxeuuncmitt.supabase.co';
+    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtyanB2ZGxsc2J4ZXV1bmNtaXR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk1ODA0MzksImV4cCI6MjA3NTE1NjQzOX0.5pnSaFe5URJmfE_DdKCsInPsIBCbKsCZCQ-yzarIwDk';
     const supabase = createClient(supabaseUrl, supabaseKey, {
       global: {
         headers: {
@@ -97,54 +95,14 @@ serve(async (req) => {
     // Processar conteúdo do arquivo
     let extractedText = '';
     try {
-      // Processar baseado no tipo de arquivo
+      const fileContent = await file.text();
+      
+      // Para PDFs e outros formatos binários, precisaríamos de uma biblioteca específica
+      // Por enquanto, vamos processar apenas arquivos de texto
       if (file.type.includes('text') || file.name.endsWith('.txt') || file.name.endsWith('.md')) {
-        // Arquivos de texto simples
-        extractedText = await file.text();
-      } else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
-        // PDFs - extrair texto usando método básico
-        const arrayBuffer = await file.arrayBuffer();
-        const uint8Array = new Uint8Array(arrayBuffer);
-        
-        // Tentar extrair texto simples do PDF (método básico)
-        const textDecoder = new TextDecoder('utf-8', { fatal: false });
-        const rawText = textDecoder.decode(uint8Array);
-        
-        // Extrair texto visível entre delimitadores de texto do PDF
-        // PDFs armazenam texto entre parênteses precedidos por comandos BT/ET
-        const textMatches = rawText.match(/\(([^)]+)\)/g) || [];
-        const extractedLines = textMatches
-          .map(match => {
-            // Remover parênteses e decodificar escape sequences
-            let text = match.slice(1, -1);
-            // Decodificar octal sequences comuns em PDFs
-            text = text.replace(/\\(\d{3})/g, (_, oct) => String.fromCharCode(parseInt(oct, 8)));
-            // Remover outros escapes
-            text = text.replace(/\\[nrt]/g, ' ');
-            return text;
-          })
-          .filter(line => line.trim().length > 0);
-        
-        extractedText = extractedLines.join(' ')
-          .replace(/\s+/g, ' ')
-          .trim();
-        
-        console.log(`📄 Extracted ${extractedText.length} characters from PDF`);
-        
-        if (!extractedText || extractedText.length < 50) {
-          throw new Error('Não foi possível extrair texto do PDF. O arquivo pode estar protegido ou ser baseado em imagens.');
-        }
-      } else if (file.type.includes('word') || file.name.endsWith('.docx') || file.name.endsWith('.doc')) {
-        // DOCX/DOC - extrair como texto
-        const arrayBuffer = await file.arrayBuffer();
-        const uint8Array = new Uint8Array(arrayBuffer);
-        const textDecoder = new TextDecoder('utf-8', { fatal: false });
-        extractedText = textDecoder.decode(uint8Array)
-          .replace(/[^\x20-\x7E\n\r\t]/g, ' ')
-          .replace(/\s+/g, ' ')
-          .trim();
+        extractedText = fileContent;
       } else {
-        throw new Error('Tipo de arquivo não suportado. Use TXT, MD, PDF ou DOCX.');
+        throw new Error('Unsupported file type. Please upload TXT or MD files for now.');
       }
 
       // Dividir o texto em chunks de conhecimento
@@ -154,10 +112,10 @@ serve(async (req) => {
         throw new Error('No content could be extracted from the file');
       }
 
-      // Inserir cada chunk na base de conhecimento (com sanitização adicional)
+      // Inserir cada chunk na base de conhecimento
       const knowledgeEntries = chunks.map(chunk => ({
-        topic: sanitizeText(chunk.topic),
-        content: sanitizeText(chunk.content),
+        topic: chunk.topic,
+        content: chunk.content,
         category: 'Documento',
         examples: [],
         metadata: {
@@ -230,28 +188,12 @@ serve(async (req) => {
   }
 });
 
-// Função para sanitizar texto
-function sanitizeText(text: string): string {
-  return text
-    // Remover caracteres de controle Unicode
-    .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
-    // Remover sequências de escape Unicode inválidas
-    .replace(/\\u[0-9a-fA-F]{0,3}(?![0-9a-fA-F])/g, '')
-    // Remover backslashes problemáticos
-    .replace(/\\(?![nrt"'\\])/g, '')
-    // Normalizar espaços em branco
-    .replace(/\s+/g, ' ')
-    // Remover caracteres especiais problemáticos
-    .replace(/[\uFFFE\uFFFF]/g, '')
-    .trim();
-}
-
 // Função para dividir texto em chunks de conhecimento
 function extractTextChunks(text: string, fileName: string): Array<{ topic: string; content: string }> {
   const chunks: Array<{ topic: string; content: string }> = [];
   
   // Limpar e normalizar o texto
-  const cleanText = sanitizeText(text.trim().replace(/\r\n/g, '\n'));
+  const cleanText = text.trim().replace(/\r\n/g, '\n');
   
   // Tentar dividir por seções (procurar por títulos/headers)
   const lines = cleanText.split('\n');
@@ -276,8 +218,8 @@ function extractTextChunks(text: string, fileName: string): Array<{ topic: strin
     if (isPossibleTitle && currentSection.length > 200) {
       // Salvar seção anterior
       chunks.push({
-        topic: sanitizeText(currentTitle || `${fileName} - Parte ${chunkIndex}`),
-        content: sanitizeText(currentSection.trim())
+        topic: currentTitle || `${fileName} - Parte ${chunkIndex}`,
+        content: currentSection.trim()
       });
       currentSection = '';
       currentTitle = line.substring(0, 100); // Limitar tamanho do título
@@ -285,8 +227,8 @@ function extractTextChunks(text: string, fileName: string): Array<{ topic: strin
     } else if (currentSection.length + line.length > maxChunkSize) {
       // Se ultrapassar tamanho máximo, criar novo chunk
       chunks.push({
-        topic: sanitizeText(currentTitle || `${fileName} - Parte ${chunkIndex}`),
-        content: sanitizeText(currentSection.trim())
+        topic: currentTitle || `${fileName} - Parte ${chunkIndex}`,
+        content: currentSection.trim()
       });
       currentSection = line + '\n';
       currentTitle = '';
@@ -303,8 +245,8 @@ function extractTextChunks(text: string, fileName: string): Array<{ topic: strin
   // Adicionar última seção
   if (currentSection.trim()) {
     chunks.push({
-      topic: sanitizeText(currentTitle || `${fileName} - Parte ${chunkIndex}`),
-      content: sanitizeText(currentSection.trim())
+      topic: currentTitle || `${fileName} - Parte ${chunkIndex}`,
+      content: currentSection.trim()
     });
   }
 

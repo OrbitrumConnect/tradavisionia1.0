@@ -15,17 +15,6 @@ interface MarketContextType {
   // Feed do narrador
   narratorFeed: NarratorSignal[];
   
-  // 🆕 Status do Dia
-  volatility: number;
-  volume: string;
-  trend: string;
-  momentum: number;
-  
-  // 🆕 Dados Técnicos
-  technicalIndicators: any;
-  patterns: any;
-  candles: any[];
-  
   // Métodos para atualizar
   updateMarketData: (data: Partial<MarketContextType>) => void;
   addNarratorSignal: (signal: NarratorSignal) => void;
@@ -42,15 +31,6 @@ export function MarketProvider({ children }: { children: ReactNode }) {
     buyerDominance: 50,
     marketPressure: 'NEUTRO',
     narratorFeed: [],
-    // 🆕 Status do Dia
-    volatility: 0,
-    volume: '0',
-    trend: 'LATERAL',
-    momentum: 0,
-    // 🆕 Dados Técnicos
-    technicalIndicators: null,
-    patterns: null,
-    candles: [],
   });
 
   const updateMarketData = (data: Partial<MarketContextType>) => {

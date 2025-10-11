@@ -193,6 +193,7 @@ SELECT
   symbol,
   COUNT(*) as total_interactions,
   COUNT(CASE WHEN learning_flag = TRUE THEN 1 END) as learning_processed,
+  AVG(confidence_score) as avg_confidence,
   MAX(timestamp) as last_interaction
 FROM public.meta_chat_history
 GROUP BY symbol

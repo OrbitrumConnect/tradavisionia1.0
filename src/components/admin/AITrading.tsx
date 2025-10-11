@@ -158,6 +158,82 @@ export function AITrading({ symbol = 'BTC/USDT' }: AITradingProps) {
     return () => clearInterval(interval);
   }, []);
 
+  // 💾 CARREGAR TRADES E STATS DO BANCO AO INICIAR
+  useEffect(() => {
+    const loadTradesFromDatabase = async () => {
+      if (!user) return;
+      
+      try {
+        console.log('💾 Carregando trades do banco...');
+        
+        const { data: savedTrades, error } = await (supabase as any)
+          .from('ai_trades')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(100);
+
+        if (error) throw error;
+
+        if (savedTrades && savedTrades.length > 0) {
+          console.log(`✅ ${savedTrades.length} trades carregados do banco`);
+          
+          // Converter trades do banco para formato local
+          const loadedTrades: Trade[] = savedTrades.map((t: any) => ({
+            id: t.id,
+            type: t.type,
+            entryPrice: t.entry_price,
+            exitPrice: t.exit_price || undefined,
+            exitTime: t.exit_time || undefined,
+            stopLoss: t.stop_loss,
+            takeProfit: t.take_profit,
+            size: t.size,
+            leverage: t.leverage,
+            timestamp: t.created_at,
+            status: t.status,
+            result: t.result || undefined,
+            pnl: t.pnl || undefined,
+            reason: t.reason || 'Trade automático'
+          }));
+          
+          setTrades(loadedTrades);
+          
+          // Verificar se há posição aberta
+          const openPosition = loadedTrades.find(t => t.status === 'OPEN');
+          if (openPosition) {
+            setCurrentPosition(openPosition);
+            console.log('🔓 Posição aberta restaurada:', openPosition.type);
+          }
+          
+          // Recalcular stats com base nos trades carregados
+          const wins = loadedTrades.filter(t => t.result === 'WIN').length;
+          const losses = loadedTrades.filter(t => t.result === 'LOSS').length;
+          const totalCompleted = wins + losses;
+          const winRate = totalCompleted > 0 ? (wins / totalCompleted) * 100 : 0;
+          const totalPnL = loadedTrades.reduce((sum, t) => sum + (t.pnl || 0), 0);
+          
+          setStats(prev => ({
+            ...prev,
+            totalTrades: loadedTrades.length,
+            wins,
+            losses,
+            winRate,
+            totalPnL,
+            balance: 1000 + totalPnL // Saldo = inicial + PnL acumulado
+          }));
+          
+          console.log('📊 Stats restaurados:', { wins, losses, winRate: winRate.toFixed(1), balance: (1000 + totalPnL).toFixed(2) });
+        } else {
+          console.log('ℹ️ Nenhum trade anterior encontrado - começando do zero');
+        }
+      } catch (error) {
+        console.error('❌ Erro ao carregar trades do banco:', error);
+      }
+    };
+
+    loadTradesFromDatabase();
+  }, [user]);
+
   // Timer do Brasil
   useEffect(() => {
     const updateBrazilTime = () => {

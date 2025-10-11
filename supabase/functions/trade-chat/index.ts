@@ -1,29 +1,16 @@
-// @ts-ignore
+// @deno-types="https://deno.land/std@0.168.0/http/server.ts"
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-// @ts-ignore
+// @deno-types="https://esm.sh/@supabase/supabase-js@2"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { SemanticSearch } from './TradeVisionAI.ts';
+
+// Declarar Deno como global para TypeScript
+declare const Deno: any;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-// 🕐 Função para saudação inteligente baseada no horário do Brasil
-function getTimeBasedGreeting(): string {
-  // Obter hora do Brasil (UTC-3)
-  const now = new Date();
-  const brazilTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
-  const hour = brazilTime.getHours();
-  
-  if (hour >= 5 && hour < 12) {
-    return 'Bom dia'; // 5h-11h59
-  } else if (hour >= 12 && hour < 18) {
-    return 'Boa tarde'; // 12h-17h59
-  } else {
-    return 'Boa noite'; // 18h-4h59
-  }
-}
 
 // Motor de IA próprio - busca contextual + análise técnica + simulações preditivas + Binance Real-Time + BUSCA SEMÂNTICA (v5.0 TURBO)
 class TradeVisionAI {
@@ -360,366 +347,6 @@ class TradeVisionAI {
   }
 
 
-  // NOVO: Função para buscar trades históricos do usuário
-  async getRecentTrades(userId: string, limit: number = 10): Promise<any[]> {
-    try {
-      const { data, error } = await this.supabase
-        .from('ai_trades')
-        .select('*')
-        .eq('user_id', userId)
-        .order('timestamp', { ascending: false })
-        .limit(limit);
-
-      if (error) {
-        console.error('❌ Erro ao buscar trades:', error);
-        return [];
-      }
-
-      console.log('📊 Trades históricos encontrados:', data?.length || 0);
-      return data || [];
-    } catch (error) {
-      console.error('❌ Erro ao buscar trades:', error);
-      return [];
-    }
-  }
-
-  // NOVO: Função para analisar performance dos trades
-  async analyzeTradePerformance(trades: any[]): Promise<{
-    winRate: number;
-    avgPnL: number;
-    bestPatterns: string[];
-    worstPatterns: string[];
-    recommendations: string[];
-  }> {
-    if (trades.length === 0) {
-      return {
-        winRate: 0,
-        avgPnL: 0,
-        bestPatterns: [],
-        worstPatterns: [],
-        recommendations: ['Aguardando mais dados para análise']
-      };
-    }
-
-    const closedTrades = trades.filter(t => t.status === 'CLOSED' && t.result);
-    const totalTrades = closedTrades.length;
-    
-    if (totalTrades === 0) {
-      return {
-        winRate: 0,
-        avgPnL: 0,
-        bestPatterns: [],
-        worstPatterns: [],
-        recommendations: ['Aguardando trades fechados para análise']
-      };
-    }
-
-    const wins = closedTrades.filter(t => t.result === 'WIN').length;
-    const winRate = (wins / totalTrades) * 100;
-    
-    const totalPnL = closedTrades.reduce((sum, t) => sum + (parseFloat(t.pnl) || 0), 0);
-    const avgPnL = totalPnL / totalTrades;
-
-    // Analisar padrões técnicos
-    const patternStats: { [key: string]: { wins: number; total: number } } = {};
-    
-    closedTrades.forEach(trade => {
-      if (trade.technical_context) {
-        try {
-          const context = JSON.parse(trade.technical_context);
-          const patterns = Object.keys(context.patterns || {}).filter(p => context.patterns[p]);
-          
-          patterns.forEach(pattern => {
-            if (!patternStats[pattern]) {
-              patternStats[pattern] = { wins: 0, total: 0 };
-            }
-            patternStats[pattern].total++;
-            if (trade.result === 'WIN') {
-              patternStats[pattern].wins++;
-            }
-          });
-        } catch (e) {
-          // Ignorar trades com contexto inválido
-        }
-      }
-    });
-
-    const bestPatterns = Object.entries(patternStats)
-      .filter(([_, stats]) => stats.total >= 3)
-      .sort(([_, a], [__, b]) => (b.wins / b.total) - (a.wins / a.total))
-      .slice(0, 3)
-      .map(([pattern, _]) => pattern);
-
-    const worstPatterns = Object.entries(patternStats)
-      .filter(([_, stats]) => stats.total >= 3)
-      .sort(([_, a], [__, b]) => (a.wins / a.total) - (b.wins / b.total))
-      .slice(0, 3)
-      .map(([pattern, _]) => pattern);
-
-    // Gerar recomendações
-    const recommendations: string[] = [];
-    
-    if (winRate >= 70) {
-      recommendations.push('Excelente performance! Continue com a estratégia atual.');
-    } else if (winRate >= 60) {
-      recommendations.push('Boa performance. Considere ajustar stop loss para melhorar.');
-    } else if (winRate >= 50) {
-      recommendations.push('Performance moderada. Revise os padrões que mais falham.');
-    } else {
-      recommendations.push('Performance baixa. Considere mudar a estratégia.');
-    }
-
-    if (bestPatterns.length > 0) {
-      recommendations.push(`Foque nos padrões: ${bestPatterns.join(', ')}`);
-    }
-
-    if (worstPatterns.length > 0) {
-      recommendations.push(`Evite ou ajuste: ${worstPatterns.join(', ')}`);
-    }
-
-    return {
-      winRate,
-      avgPnL,
-      bestPatterns,
-      worstPatterns,
-      recommendations
-    };
-  }
-
-  // 🧠 SISTEMA ADAPTATIVO: Detecta contexto e ajusta perfil automaticamente
-  detectMarketContext(indicators: any, marketData: any, pattern: any) {
-    let baseConfidence = 50;
-    let aggressiveness = 'balanced'; // conservative | balanced | aggressive
-    let threshold = 65;
-    let profile = 'ADAPTATIVO';
-    
-    // 🔥 ANÁLISE MULTI-FATOR
-    let signalStrength = 0;
-    
-    // 1. VOLUME (peso: 30%)
-    const volumeScore = marketData?.volume || 0;
-    if (volumeScore > 1.5) {
-      signalStrength += 30; // Volume alto = mercado ativo
-      baseConfidence += 10;
-      profile = 'AGRESSIVO';
-    } else if (volumeScore > 0.8) {
-      signalStrength += 15; // Volume normal
-      baseConfidence += 5;
-    } else {
-      signalStrength += 5; // Volume baixo
-    }
-    
-    // 2. VOLATILIDADE (peso: 25%)
-    const volatility = Math.abs(indicators?.RSI - 50) || 0;
-    if (volatility > 20) {
-      signalStrength += 25; // Alta volatilidade = oportunidades
-      baseConfidence += 8;
-      aggressiveness = 'aggressive';
-    } else if (volatility > 10) {
-      signalStrength += 12; // Volatilidade média
-      baseConfidence += 4;
-    } else {
-      signalStrength += 3; // Baixa volatilidade
-    }
-    
-    // 3. MOMENTUM (peso: 25%)
-    const macdStrength = Math.abs(indicators?.MACD?.histogram || 0);
-    if (macdStrength > 50) {
-      signalStrength += 25; // Momentum forte
-      baseConfidence += 10;
-      profile = 'AGRESSIVO';
-    } else if (macdStrength > 20) {
-      signalStrength += 12; // Momentum médio
-      baseConfidence += 5;
-    } else {
-      signalStrength += 5; // Momentum fraco
-    }
-    
-    // 4. QUALIDADE DO PADRÃO (peso: 20%)
-    const patternQuality = this.evaluatePatternQuality(pattern);
-    signalStrength += patternQuality.score;
-    baseConfidence += patternQuality.bonus;
-    
-    // 🎯 AJUSTE DINÂMICO DE THRESHOLD
-    if (signalStrength >= 70) {
-      threshold = 55; // Mercado forte = menos exigente
-      aggressiveness = 'aggressive';
-      profile = 'AGRESSIVO';
-    } else if (signalStrength >= 50) {
-      threshold = 60; // Mercado normal = balanceado
-      aggressiveness = 'balanced';
-      profile = 'BALANCEADO';
-    } else {
-      threshold = 70; // Mercado fraco = mais exigente
-      aggressiveness = 'conservative';
-      profile = 'CONSERVADOR';
-    }
-    
-    return {
-      baseConfidence: Math.min(baseConfidence, 75), // Cap em 75
-      threshold,
-      aggressiveness,
-      signalStrength,
-      profile,
-      reasoning: `Mercado ${signalStrength >= 70 ? 'forte' : signalStrength >= 50 ? 'normal' : 'fraco'} - Perfil ${profile}`
-    };
-  }
-  
-  // Avaliar qualidade do padrão
-  evaluatePatternQuality(pattern: any) {
-    const qualityMap = {
-      'Order Block': { score: 20, bonus: 15, description: 'Alta confiabilidade' },
-      'CHOCH': { score: 20, bonus: 20, description: 'Reversão forte' },
-      'BOS': { score: 18, bonus: 15, description: 'Continuação confirmada' },
-      'FVG': { score: 15, bonus: 12, description: 'Zona de liquidez' },
-      'Spring': { score: 18, bonus: 15, description: 'Wyckoff válido' },
-      'Upthrust': { score: 18, bonus: 15, description: 'Wyckoff válido' },
-      'Liquidity Sweep': { score: 15, bonus: 12, description: 'Varrida detectada' },
-      'default': { score: 10, bonus: 8, description: 'Padrão técnico' }
-    };
-    
-    return qualityMap[pattern.type] || qualityMap['default'];
-  }
-
-  // NOVO: Função para lidar com consultas do Narrador
-  async handleNarratorConsultation(message: string, realTimeContext: any, userId: string) {
-    try {
-      const pattern = realTimeContext.pattern;
-      const marketData = realTimeContext.marketData;
-      const indicators = realTimeContext.technicalIndicators;
-      
-      console.log('🧠 Analisando padrão do Narrador:', pattern.type);
-      
-      // 🧠 SISTEMA ADAPTATIVO: Detectar contexto do mercado
-      const marketContext = this.detectMarketContext(indicators, marketData, pattern);
-      console.log('🎯 Contexto detectado:', marketContext);
-      
-      // Análise técnica do padrão
-      let analysis = '';
-      let recommendation = 'WAIT';
-      let confidence = marketContext.baseConfidence; // Dinâmico baseado em contexto!
-      
-      // Analisar RSI (Sistema Adaptativo)
-      if (indicators?.RSI) {
-        if (indicators.RSI < 30) {
-          analysis += 'RSI em sobrevenda (30), indicando possível reversão. ';
-          confidence += 15;
-        } else if (indicators.RSI > 70) {
-          analysis += 'RSI em sobrecompra (70), indicando possível reversão. ';
-          confidence += 15;
-        } else if (indicators.RSI >= 40 && indicators.RSI <= 60) {
-          analysis += 'RSI em zona saudável (equilíbrio). ';
-          confidence += 8; // Zona neutra é BOM!
-        } else if (indicators.RSI > 60 && indicators.RSI <= 70) {
-          analysis += 'RSI indicando força compradora. ';
-          confidence += 10;
-        } else if (indicators.RSI >= 30 && indicators.RSI < 40) {
-          analysis += 'RSI indicando força vendedora. ';
-          confidence += 10;
-        }
-      }
-      
-      // Analisar MACD (Sistema Adaptativo)
-      if (indicators?.MACD) {
-        const macdHist = indicators.MACD.histogram || 0;
-        if (macdHist > 50) {
-          analysis += 'MACD muito positivo, momentum forte de alta. ';
-          confidence += 15;
-        } else if (macdHist > 0) {
-          analysis += 'MACD positivo, momentum de alta. ';
-          confidence += 10;
-        } else if (macdHist < -50) {
-          analysis += 'MACD muito negativo, momentum forte de baixa. ';
-          confidence += 15;
-        } else if (macdHist < 0) {
-          analysis += 'MACD negativo, momentum de baixa. ';
-          confidence += 10;
-        } else {
-          analysis += 'MACD neutro, sem direção clara. ';
-          confidence += 3; // Neutro soma algo!
-        }
-      }
-      
-      // Analisar padrão específico
-      switch (pattern.type) {
-        case 'Order Block':
-          analysis += 'Order Block detectado - nível de suporte/resistência forte. ';
-          confidence += 20;
-          recommendation = 'GENERATE_SIGNAL';
-          break;
-        case 'FVG':
-          analysis += 'Fair Value Gap identificado - zona de liquidez. ';
-          confidence += 15;
-          recommendation = 'GENERATE_SIGNAL';
-          break;
-        case 'CHOCH':
-          analysis += 'Change of Character detectado - possível reversão de tendência. ';
-          confidence += 25;
-          recommendation = 'GENERATE_SIGNAL';
-          break;
-        case 'BOS':
-          analysis += 'Break of Structure confirmado - continuação de tendência. ';
-          confidence += 20;
-          recommendation = 'GENERATE_SIGNAL';
-          break;
-        default:
-          analysis += 'Padrão técnico detectado, analisando contexto. ';
-          confidence += marketContext.aggressiveness === 'aggressive' ? 15 : 
-                       marketContext.aggressiveness === 'balanced' ? 10 : 5;
-      }
-      
-      // Verificar contexto de preço
-      if (marketData?.price) {
-        const price = parseFloat(marketData.price.replace(/[,$]/g, ''));
-        if (price > 0) {
-          analysis += `Preço atual: $${price.toLocaleString()}. `;
-        }
-      }
-      
-      // 🎯 DECISÃO FINAL ADAPTATIVA (usa threshold dinâmico!)
-      const finalRecommendation = confidence >= marketContext.threshold ? 'GENERATE_SIGNAL' : 'WAIT';
-      const finalConfidence = Math.min(confidence, 95);
-      
-      console.log('🧠 Decisão final do Agente (ADAPTATIVA):', {
-        confidence,
-        finalConfidence,
-        threshold: marketContext.threshold,
-        profile: marketContext.profile,
-        signalStrength: marketContext.signalStrength,
-        finalRecommendation,
-        pattern: pattern.type
-      });
-      
-      const response = `🧠 ANÁLISE DO AGENTE [${marketContext.profile}]: ${analysis}
-
-${finalRecommendation === 'GENERATE_SIGNAL' 
-  ? `✅ RECOMENDO: Gerar sinal com ${finalConfidence}% de confiança (threshold: ${marketContext.threshold}%).` 
-  : `⏸️ AGUARDAR: Confiança ${finalConfidence}% < threshold ${marketContext.threshold}% (${marketContext.reasoning}).`}
-
-Contexto: ${pattern.type} em ${marketData?.symbol || 'N/A'}.`;
-      
-      return {
-        response,
-        contextType: 'narrator-consultation',
-        referenceChunks: [],
-        conversationState: { pattern, marketData, indicators },
-        recommendation: finalRecommendation,
-        confidence: finalConfidence
-      };
-      
-    } catch (error) {
-      console.error('❌ Erro na consulta do Narrador:', error);
-      return {
-        response: 'Erro na análise. Aguardar próxima oportunidade.',
-        contextType: 'error',
-        referenceChunks: [],
-        conversationState: {},
-        recommendation: 'WAIT',
-        confidence: 0
-      };
-    }
-  }
-
   // Sistema conversacional humanizado com IA + contexto em tempo real
   async generateResponse(
     message: string, 
@@ -728,10 +355,10 @@ Contexto: ${pattern.type} em ${marketData?.symbol || 'N/A'}.`;
     realTimeContext?: any,
     userEmbedding?: number[],
     image?: string
-  ): Promise<{ response: string; contextType: string; referenceChunks: string[]; conversationState: any; recommendation?: string; confidence?: number }> {
+  ): Promise<{ response: string; contextType: string; referenceChunks: string[]; conversationState: any }> {
     // Se houver imagem, usar LLM com visão para extrair texto e análise
     if (image) {
-      const LOVABLE_API_KEY = (globalThis as any).Deno?.env?.get('LOVABLE_API_KEY') || process.env.LOVABLE_API_KEY;
+      const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
       if (!LOVABLE_API_KEY) {
         console.error('❌ LOVABLE_API_KEY não configurada');
         return {
@@ -795,16 +422,6 @@ Contexto: ${pattern.type} em ${marketData?.symbol || 'N/A'}.`;
       }
     }
 
-    // 0. DETECTAR CONSULTA DO NARRADOR
-    const isNarratorConsultation = message.includes('🎙️ NARRADOR') && 
-                                   message.includes('CONSULTANDO') &&
-                                   realTimeContext?.consultationType === 'narrator-signal-validation';
-    
-    if (isNarratorConsultation) {
-      console.log('🎙️ Detectada consulta do Narrador:', realTimeContext.pattern);
-      return await this.handleNarratorConsultation(message, realTimeContext, userId);
-    }
-
     // 1. BUSCA SEMÂNTICA
     let semanticContext: any[] = [];
     if (userEmbedding && userEmbedding.length > 0) {
@@ -856,7 +473,7 @@ Contexto: ${pattern.type} em ${marketData?.symbol || 'N/A'}.`;
     const questionType = this.detectQuestionType(message);
     
     // Simular cenários se for análise
-    let scenarios: any[] = [];
+    let scenarios: any[] | null = null;
     if (enrichedContext?.price) {
       const priceNum = typeof enrichedContext.price === 'string' 
         ? parseFloat(enrichedContext.price.replace(/,/g, ''))
@@ -870,26 +487,20 @@ Contexto: ${pattern.type} em ${marketData?.symbol || 'N/A'}.`;
     }
 
     // 🤖 USAR GEMINI PARA RESPOSTA CONVERSACIONAL HUMANIZADA
-    const LOVABLE_API_KEY = (globalThis as any).Deno?.env?.get('LOVABLE_API_KEY') || process.env.LOVABLE_API_KEY;
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     let responseText = '';
     
     if (LOVABLE_API_KEY) {
       try {
-        // Buscar trades históricos do usuário
-        const tradesHistory = await this.getRecentTrades(userId, 20);
-        const tradePerformance = await this.analyzeTradePerformance(tradesHistory);
-
         // Preparar contexto rico para o LLM COM MULTI-TIMEFRAME
         const contextForLLM = this.buildContextForLLM(
           message,
           knowledge,
           enrichedContext,
           signals,
-          scenarios || [],
+          scenarios,
           semanticContext,
-          multiTimeframeContext,
-          tradesHistory,
-          tradePerformance
+          multiTimeframeContext
         );
 
         const llmResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -904,10 +515,6 @@ Contexto: ${pattern.type} em ${marketData?.symbol || 'N/A'}.`;
               {
                 role: 'system',
                 content: `Você é TradeVision IA, Master Trader Institucional e Analista Cognitivo.
-
-🕐 HORÁRIO ATUAL: ${getTimeBasedGreeting()} (Brasil) - Use esta saudação em greetings!
-
-Você é TradeVision IA, Master Trader Institucional e Analista Cognitivo.
 
 🧠 IDENTIDADE PROFISSIONAL
 Nome: TradeVision IA
@@ -943,7 +550,7 @@ Não sou apenas um bot — sou um mentor autônomo que ensina, acompanha e evolu
    - NUNCA use templates fixos ou frases robotizadas
 
 3. TOM ADAPTATIVO:
-   - Greeting: Use getTimeBasedGreeting() para saudação (Bom dia/Boa tarde/Boa noite automático!)
+   - Greeting: "Boa noite, Pedro. O mercado está respirando fundo hoje."
    - Análise técnica: Preciso, educativo, confiante
    - Dúvida do usuário: Empático, didático, paciente
    - Alerta de risco: Direto, firme, protetor
@@ -1042,7 +649,7 @@ Agora responda com maestria, elegância e precisão humana.`
         risk_level: profile.risk_level,
         trading_style: profile.trading_style
       },
-      simulationsGenerated: (scenarios as any[])?.length || 0
+      simulationsGenerated: scenarios?.length || 0
     };
 
     return {
@@ -1063,11 +670,9 @@ Agora responda com maestria, elegância e precisão humana.`
     knowledge: any[],
     marketContext: any,
     signals: any[],
-    scenarios: any[],
+    scenarios: any[] | null,
     semanticContext: any[],
-    multiTimeframeContext?: any,
-    tradesHistory?: any[],
-    tradePerformance?: any
+    multiTimeframeContext?: any
   ): string {
     let context = `Pergunta do usuário: "${userMessage}"\n\n`;
 
@@ -1116,40 +721,6 @@ Agora responda com maestria, elegância e precisão humana.`
       context += `\n---\n\n`;
     } else {
       context += `⏳ Sistema multi-timeframe ainda coletando dados iniciais...\n\n`;
-    }
-
-    // NOVO: Adicionar histórico de trades e performance
-    if (tradesHistory && tradesHistory.length > 0) {
-      context += `🤖 **HISTÓRICO DE TRADES AUTOMÁTICOS**\n`;
-      context += `Total de trades: ${tradesHistory.length}\n`;
-      
-      if (tradePerformance) {
-        context += `\n📈 **PERFORMANCE ATUAL:**\n`;
-        context += `- Win Rate: ${tradePerformance.winRate.toFixed(1)}%\n`;
-        context += `- P&L Médio: $${tradePerformance.avgPnL.toFixed(2)}\n`;
-        
-        if (tradePerformance.bestPatterns.length > 0) {
-          context += `- Melhores Padrões: ${tradePerformance.bestPatterns.join(', ')}\n`;
-        }
-        
-        if (tradePerformance.worstPatterns.length > 0) {
-          context += `- Padrões Problemáticos: ${tradePerformance.worstPatterns.join(', ')}\n`;
-        }
-        
-        context += `\n💡 **RECOMENDAÇÕES BASEADAS EM DADOS:**\n`;
-        tradePerformance.recommendations.forEach(rec => {
-          context += `- ${rec}\n`;
-        });
-      }
-      
-      context += `\n🕐 **ÚLTIMOS 5 TRADES:**\n`;
-      tradesHistory.slice(0, 5).forEach((trade, index) => {
-        const result = trade.result ? `(${trade.result})` : '(Aberto)';
-        const pnl = trade.pnl ? ` P&L: $${parseFloat(trade.pnl).toFixed(2)}` : '';
-        context += `${index + 1}. ${trade.trade_type} @ $${trade.entry_price} ${result}${pnl}\n`;
-      });
-      
-      context += `\n---\n\n`;
     }
 
     // Dados de mercado em tempo real
@@ -1308,7 +879,7 @@ Agora responda com maestria, elegância e precisão humana.`
     signals?: any[],
     conversationState?: any,
     proactiveAlert?: string | null,
-    scenarios?: any[] | null,
+    scenarios?: any[] | null | undefined,
     profile?: any
   ): string {
     const rt = realTimeContext || {};
@@ -1400,8 +971,8 @@ Agora responda com maestria, elegância e precisão humana.`
         return response;
 
       case 'analysis_start':
-        // @ts-ignore
-        response += this.buildAnalysisResponse(knowledge, rt, signals, randomClosing, scenarios as any);
+        // @ts-ignore - scenarios is properly handled with || []
+        response += this.buildAnalysisResponse(knowledge, rt, signals, randomClosing, scenarios || []);
         return response;
 
       case 'price': {
@@ -1443,8 +1014,8 @@ Agora responda com maestria, elegância e precisão humana.`
       }
 
       case 'market_status':
-        // @ts-ignore
-        response += this.buildAnalysisResponse(knowledge, rt, signals, randomClosing, scenarios as any);
+        // @ts-ignore - scenarios is properly handled with || []
+        response += this.buildAnalysisResponse(knowledge, rt, signals, randomClosing, scenarios || []);
         return response;
 
       case 'followup':
@@ -1457,7 +1028,7 @@ Agora responda com maestria, elegância e precisão humana.`
     }
   }
 
-  buildFollowupResponse(message: string, knowledge: any[], rt: any, closing: string, lastMessages: any[], scenarios?: any[] | null): string {
+  buildFollowupResponse(message: string, knowledge: any[], rt: any, closing: string, lastMessages: any[], scenarios?: any[] | null | undefined): string {
     const msg = message.toLowerCase();
     
     // Respostas para preço com contexto expandido
@@ -1554,8 +1125,7 @@ Agora responda com maestria, elegância e precisão humana.`
     return fallbacks[Math.floor(Math.random() * fallbacks.length)];
   }
 
-  buildAnalysisResponse(knowledge: any[], rt: any, signals: any[], closing: string, scenarios?: any): string {
-    const safeScenarios = scenarios || [];
+  buildAnalysisResponse(knowledge: any[], rt: any, signals: any[], closing: string, scenarios?: any[] | null | undefined): string {
     const intros = [
       `Analisando o cenário atual do mercado`,
       `Vamos ver o que os dados mostram`,
@@ -1597,9 +1167,9 @@ Agora responda com maestria, elegância e precisão humana.`
     }
 
     // Simulações de cenários
-    if (safeScenarios && safeScenarios.length > 0) {
+    if (scenarios && scenarios.length > 0) {
       response += `🎯 **Simulações de Cenários (What-If Analysis)**:\n\n`;
-      safeScenarios.forEach((scenario, i) => {
+      scenarios.forEach((scenario, i) => {
         response += `**Cenário ${i + 1}: ${scenario.description}**\n`;
         response += `   • Entrada: $${scenario.entry_price.toFixed(2)}\n`;
         response += `   • Stop Loss: $${scenario.stop_loss.toFixed(2)}\n`;
@@ -1724,7 +1294,7 @@ Agora responda com maestria, elegância e precisão humana.`
     return response;
   }
 
-  buildGeneralResponse(message: string, knowledge: any[], rt: any, closing: string, scenarios?: any[] | null): string {
+  buildGeneralResponse(message: string, knowledge: any[], rt: any, closing: string, scenarios?: any[] | null | undefined): string {
     if (knowledge.length === 0) {
       const suggestions = [
         `Não encontrei informações específicas sobre isso ainda. Pode reformular? Por exemplo:\n• "Analise o BTC agora"\n• "Como identificar order blocks?"\n• "Mostre os últimos sinais"`,
@@ -1981,8 +1551,8 @@ serve(async (req) => {
 
     // Conectar ao Supabase
     const supabase = createClient(
-      (globalThis as any).Deno?.env?.get('SUPABASE_URL') || process.env.SUPABASE_URL || '',
-      (globalThis as any).Deno?.env?.get('SUPABASE_SERVICE_ROLE_KEY') || process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
     // Motor de IA próprio com contexto em tempo real + BUSCA SEMÂNTICA + VISÃO

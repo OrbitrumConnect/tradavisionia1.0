@@ -1,10 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { useNarratorContext } from '@/contexts/NarratorContext';
 
 export interface NarratorSignal {
-  id: string;
   symbol: string;
   timeframe: string;
   timestamp: string;
@@ -82,122 +80,15 @@ export const useNarrator = (
   selectedPair: string,
   selectedTimeframe: string,
   technicalIndicators?: any,
-  detectedPatterns?: any,
-  speakEnabled: boolean = true
+  detectedPatterns?: any
 ) => {
   const { user } = useAuth();
-  const { addNarratorSignal } = useNarratorContext();
   const [isPlaying, setIsPlaying] = useState(true);
   const [feed, setFeed] = useState<NarratorSignal[]>([]);
   
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isRunningRef = useRef(false);
-
-  // NOVO: Função para consultar Agente antes de gerar sinal
-  const consultAgentBeforeSignal = async (pattern: any, symbol: string, timeframe: string, liveData: any, indicators: any) => {
-    try {
-      console.log('🤖 Consultando Agente TradeVision IA...');
-      
-      const { data, error } = await supabase.functions.invoke('trade-chat', {
-        body: {
-          message: `🎙️ NARRADOR ${timeframe.toUpperCase()} CONSULTANDO: Detectei ${pattern.type} em ${symbol} a ${liveData?.price || 'N/A'}. RSI: ${indicators?.RSI?.toFixed(1) || 'N/A'}. MACD: ${indicators?.MACD?.histogram?.toFixed(2) || 'N/A'}. Devo gerar sinal? Qual sua análise?`,
-          userId: user?.id,
-          sessionId: `narrator-consultation-${Date.now()}`,
-          realTimeContext: {
-            pattern,
-            marketData: {
-              symbol,
-              timeframe,
-              price: liveData?.price || '0',
-              volume: liveData?.volume || '0'
-            },
-            technicalIndicators: indicators,
-            consultationType: 'narrator-signal-validation',
-            timestamp: new Date().toISOString()
-          }
-        }
-      });
-
-      if (error) {
-        console.error('❌ Erro ao consultar Agente:', error);
-        return { recommendation: 'WAIT', reasoning: 'Erro na consulta ao Agente' };
-      }
-
-      // Extrair recomendação da resposta do Agente
-      const response = data.response || '';
-      console.log('🤖 Resposta do Agente:', response);
-      console.log('🤖 Data completa do Agente:', data);
-      
-      const isApproved = response.includes('GENERATE_SIGNAL') || 
-                        response.includes('gerar sinal') || 
-                        response.includes('recomendo') ||
-                        response.includes('aprovado') ||
-                        response.includes('RECOMENDO');
-      
-      console.log('🤖 Agente aprovou sinal?', isApproved);
-      
-      return {
-        recommendation: isApproved ? 'GENERATE_SIGNAL' : 'WAIT',
-        reasoning: response,
-        confidence: data.confidence || 70,
-        agentResponse: data
-      };
-    } catch (error) {
-      console.error('❌ Erro na consulta ao Agente:', error);
-      return { recommendation: 'WAIT', reasoning: 'Erro na consulta' };
-    }
-  };
-
-  // Função para ajustar probabilidade baseada em histórico
-  const adjustProbabilityBasedOnHistory = async (pattern: string, baseProbability: number): Promise<number> => {
-    try {
-      // Buscar histórico do padrão
-      const { data: history, error } = await supabase
-        .from('narrator_signals')
-        .select('result')
-        .eq('pattern', pattern)
-        .not('result', 'is', null)
-        .limit(20); // Últimos 20 sinais deste padrão
-
-      if (error || !history || history.length < 5) {
-        // Não tem histórico suficiente, usa probabilidade base
-        return baseProbability;
-      }
-
-      // Calcular win rate do padrão
-      const wins = history.filter((h: any) => h.result === 'WIN').length;
-      const total = history.length;
-      const winRate = (wins / total) * 100;
-
-      console.log(`📊 Histórico do padrão "${pattern}": ${wins}/${total} (${winRate.toFixed(1)}%)`);
-
-      // Ajustar probabilidade baseado no win rate
-      let adjustedProbability = baseProbability;
-      
-      if (winRate >= 80) {
-        adjustedProbability += 10; // Padrão excelente
-      } else if (winRate >= 70) {
-        adjustedProbability += 5;  // Padrão bom
-      } else if (winRate >= 60) {
-        adjustedProbability += 2;  // Padrão ok
-      } else if (winRate < 40) {
-        adjustedProbability -= 15; // Padrão ruim
-      } else if (winRate < 50) {
-        adjustedProbability -= 10; // Padrão fraco
-      }
-
-      // Garantir que fica entre 30-95%
-      adjustedProbability = Math.max(30, Math.min(95, adjustedProbability));
-
-      console.log(`🎯 Probabilidade ajustada: ${baseProbability}% → ${adjustedProbability}%`);
-      
-      return adjustedProbability;
-    } catch (error) {
-      console.error('❌ Erro ao ajustar probabilidade:', error);
-      return baseProbability;
-    }
-  };
 
   const generateSignal = async () => {
     // Verificar se ainda está ativo antes de gerar
@@ -207,17 +98,12 @@ export const useNarrator = (
     }
 
     console.log('🎙️ Iniciando geração de sinal inteligente...');
-    console.log('🔍 Debug - detectedPatterns:', detectedPatterns);
-    console.log('🔍 Debug - liveData:', liveData);
-    console.log('🔍 Debug - technicalIndicators:', technicalIndicators);
 
     // APENAS análise inteligente real - SEM FALLBACK FICTÍCIO
     if (detectedPatterns && Object.keys(detectedPatterns).length > 0) {
-      console.log('✅ Padrões detectados, gerando sinal...');
       await generateIntelligentSignal();
     } else {
       console.log('⏳ Aguardando padrões serem detectados...');
-      console.log('🔍 Debug - detectedPatterns é null/undefined ou vazio');
     }
   };
 
@@ -234,11 +120,50 @@ export const useNarrator = (
       // Preparar dados para análise + timestamp de detecção
       const detectedAt = Date.now();
       const pattern = {
-        type: detectedPatterns.orderBlockDetected ? 'Order Block' :
+        // 🆕 PRIORIDADE 1: Padrões Geométricos Avançados (Price Action Matemática)
+        type: detectedPatterns.triangleDetected ? `Triângulo ${detectedPatterns.triangleType || 'Simétrico'}` :
+              detectedPatterns.bandeiraDetected ? `Bandeira ${detectedPatterns.bandeiraType === 'bullish' ? 'Alta' : 'Baixa'}` :
+              detectedPatterns.cunhaDetected ? `Cunha ${detectedPatterns.cunhaType === 'rising' ? 'Ascendente' : 'Descendente'}` :
+              detectedPatterns.elliottDetected ? `Elliott Wave ${detectedPatterns.elliottWave || 'Detectada'}` :
+              // 🕯️ PRIORIDADE 2: Padrões de Vela (Candlestick Patterns)
+              detectedPatterns.candlePatternDetected && detectedPatterns.candlePatternStrength === 'strong' ? detectedPatterns.candlePatternType :
+              // Padrões Clássicos (prioridade menor)
+              detectedPatterns.orderBlockDetected ? 'Order Block' :
               detectedPatterns.fvgDetected ? 'FVG' :
               detectedPatterns.chochDetected ? 'CHOCH' :
               detectedPatterns.bosDetected ? 'BOS' :
+              // 🕯️ Padrões de vela mais fracos (última prioridade)
+              detectedPatterns.candlePatternDetected ? detectedPatterns.candlePatternType :
               'Estrutura Técnica',
+        
+        // 🆕 Dados dos padrões geométricos
+        triangle_type: detectedPatterns.triangleType,
+        triangle_convergence: detectedPatterns.triangleConvergence,
+        triangle_height: detectedPatterns.triangleHeight,
+        triangle_target: detectedPatterns.triangleTarget,
+        
+        bandeira_type: detectedPatterns.bandeiraType,
+        bandeira_inclinacao: detectedPatterns.bandeiraInclinacao,
+        bandeira_alvo: detectedPatterns.bandeiraAlvo,
+        
+        cunha_type: detectedPatterns.cunhaType,
+        cunha_convergence: detectedPatterns.cunhaConvergence,
+        cunha_target: detectedPatterns.cunhaTarget,
+        
+        elliott_wave: detectedPatterns.elliottWave,
+        elliott_phase: detectedPatterns.elliottPhase,
+        elliott_target: detectedPatterns.elliottTarget,
+        
+        // 🕯️ Padrões de vela
+        candle_pattern_type: detectedPatterns.candlePatternType,
+        candle_pattern_strength: detectedPatterns.candlePatternStrength,
+        candle_pattern_direction: detectedPatterns.candlePatternDirection,
+        candle_pattern_message: detectedPatterns.candlePatternMessage,
+        
+        // Mensagem auto-gerada (se disponível)
+        pattern_message: detectedPatterns.patternMessage,
+        
+        // Padrões clássicos
         order_block_type: detectedPatterns.orderBlockType,
         fvg_type: detectedPatterns.fvgType,
         support_level: detectedPatterns.supportLevel,
@@ -246,128 +171,107 @@ export const useNarrator = (
         detected_at: detectedAt
       };
 
-      // NOVO: Consultar Agente TradeVision IA antes de gerar sinal
-      const agentValidation = await consultAgentBeforeSignal(pattern, selectedPair, selectedTimeframe, liveData, technicalIndicators);
-      
-      // Só prosseguir se Agente aprovar
-      if (agentValidation.recommendation !== 'GENERATE_SIGNAL') {
-        console.log('⏸️ Sinal descartado pelo Agente:', agentValidation.reasoning);
-        console.log('🔍 Debug - agentValidation:', agentValidation);
-        
-        // Se o Agente rejeitou, ainda assim podemos falar sobre isso
-        if (speakEnabled && enabled && isPlaying && isRunningRef.current) {
-          const utterance = new SpeechSynthesisUtterance(
-            `Sinal descartado pelo Agente TradeVision IA. ${agentValidation.reasoning}`
-          );
-          utterance.lang = 'pt-BR';
-          utterance.rate = 0.8;
-          speechSynthesis.speak(utterance);
-        }
-        return;
-      }
-      
-      // 🎯 EXTRAIR DIREÇÃO DO AGENTE (Sistema Adaptativo!)
-      const agentDirection = agentValidation.agentResponse?.direction || 
-                           (agentValidation.reasoning?.includes('BULL') || agentValidation.reasoning?.includes('COMPRA') || agentValidation.reasoning?.includes('LONG') ? 'BUY' :
-                            agentValidation.reasoning?.includes('BEAR') || agentValidation.reasoning?.includes('VENDA') || agentValidation.reasoning?.includes('SHORT') ? 'SELL' :
-                            null);
-      
-      console.log('🎯 Direção detectada do Agente:', agentDirection);
-
       // Buscar notícia real da API
       const latestNews = await fetchLatestNews(selectedPair);
 
-      // 🎯 USAR DIREÇÃO DO AGENTE ADAPTATIVO (não chama intelligent-narrator)
-      // Se Agente não sugeriu direção, inferir do padrão
-      let finalDirection = agentDirection;
-      
-      if (!finalDirection) {
-        // Inferir direção baseado no padrão detectado
-        if (detectedPatterns.orderBlockType === 'bullish' || detectedPatterns.fvgType === 'bullish' || detectedPatterns.springDetected) {
-          finalDirection = 'BUY';
-        } else if (detectedPatterns.orderBlockType === 'bearish' || detectedPatterns.fvgType === 'bearish' || detectedPatterns.upthrustDetected) {
-          finalDirection = 'SELL';
-        } else if (technicalIndicators?.rsi14 > 55) {
-          finalDirection = 'BUY';
-        } else if (technicalIndicators?.rsi14 < 45) {
-          finalDirection = 'SELL';
-        } else {
-          // Último recurso: usar MACD
-          finalDirection = (technicalIndicators?.macdHistogram || 0) > 0 ? 'BUY' : 'SELL';
+      const marketData = {
+        symbol: selectedPair,
+        timeframe: selectedTimeframe,
+        price: liveData?.price || '0',
+        volume: liveData?.volume,
+        news: latestNews
+      };
+
+      // Chamar edge function de análise inteligente
+      const { data, error } = await supabase.functions.invoke('intelligent-narrator', {
+        body: {
+          pattern,
+          marketData,
+          technicalIndicators,
+          userId: user.id
         }
+      });
+
+      if (error) {
+        console.error('❌ Erro na análise:', error);
+        return; // SEM fallback - aguardar próximo ciclo
       }
-      
-      console.log('🎯 Direção final do sinal:', finalDirection);
-      
+
+      if (!data.success) {
+        console.log('⚠️ Sinal descartado pela TradeVision IA:', data.reason);
+        
+        // Notificar usuário sobre descarte inteligente
+        if (enabled && isPlaying) {
+          const utterance = new SpeechSynthesisUtterance(
+            `Sinal descartado. ${data.aiValidation || 'Score abaixo do mínimo aceitável.'}`
+          );
+          utterance.lang = 'pt-BR';
+          utterance.rate = 0.85;
+          utterance.pitch = 0.9;
+          speechSynthesis.speak(utterance);
+        }
+        return; // SEM fallback fictício
+      }
+
       const analysisEndTime = Date.now();
       const totalAnalysisTime = analysisEndTime - detectedAt;
-      console.log(`✅ Sinal VALIDADO pelo Agente Adaptativo em ${totalAnalysisTime}ms!`);
+      console.log(`✅ Sinal VALIDADO pela TradeVision IA em ${totalAnalysisTime}ms!`, data.aiValidation);
 
-      // 🎯 Ajustar probabilidade baseada em histórico
-      const baseProbability = agentValidation.confidence || 75;
-      const patternDesc = `${pattern.type || 'Padrão'} (${finalDirection})`;
-      const adjustedProbability = await adjustProbabilityBasedOnHistory(patternDesc, baseProbability);
-
-      // Gerar figura técnica
-      const figure = `${pattern.type || 'Estrutura Técnica'} | RSI: ${technicalIndicators?.rsi14?.toFixed(1) || 'N/A'} | MACD: ${technicalIndicators?.macdHistogram?.toFixed(2) || 'N/A'} | Validação: Agente Adaptativo`;
+      // Adicionar ao feed com validação IA
+      const timing = data.signal.metadata?.timing;
+      const aiValidation = data.signal.metadata?.tradevision_validation;
+      const mtContext = data.signal.metadata?.multi_timeframe_context;
       
-      // Risk note baseado em volatilidade
-      const riskLevel = technicalIndicators?.atr > 100 ? 'Alto' : 
-                       technicalIndicators?.atr > 50 ? 'Médio' : 'Baixo';
+      // Contexto multi-timeframe para narração
+      const mtContextText = mtContext ? 
+        `M1: ${mtContext.m1?.trend || 'aguardando'} | M5: ${mtContext.m5?.trend || 'aguardando'} | M15: ${mtContext.m15?.trend || 'aguardando'} | M30: ${mtContext.m30?.trend || 'aguardando'}` :
+        'Contexto multi-timeframe carregando...';
 
       const signal: NarratorSignal = {
-        id: `signal-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         symbol: selectedPair,
         timeframe: selectedTimeframe,
         timestamp: new Date().toISOString(),
-        type: finalDirection as 'BUY' | 'SELL', // 🎯 Direção do Agente Adaptativo!
-        probability: adjustedProbability,
-        pattern: patternDesc,
-        figure,
-        risk: `Risco ${riskLevel} | Volatilidade: ${technicalIndicators?.atr?.toFixed(2) || 'N/A'}`,
-        price: liveData?.price || '0',
-        news: latestNews,
-        marketStatus: `Validado pelo Agente Adaptativo | Confiança: ${agentValidation.confidence}% | Tempo: ${totalAnalysisTime}ms`,
+        type: data.signal.signal_type,
+        probability: data.signal.probability,
+        pattern: data.signal.pattern,
+        figure: `${data.signal.figure} | ${mtContextText}`,
+        risk: data.signal.risk_note,
+        price: data.signal.price,
+        news: data.signal.news || '',
+        marketStatus: `${data.signal.market_status} | IA: ${aiValidation?.recommendation || 'VALIDADO'} | ${totalAnalysisTime}ms`,
         pairData: pairInfo[selectedPair as keyof typeof pairInfo] || pairInfo['BTC/USDT']
       };
 
       setFeed((prev) => [signal, ...prev.slice(0, 49)]);
-      
-      // Adicionar sinal ao contexto compartilhado para o Sistema 3 IAs
-      addNarratorSignal(signal);
-      
-      // 💾 Salvar no banco de dados
-      await supabase.from('narrator_signals').insert({
-        user_id: user.id,
-        symbol: selectedPair,
-        timeframe: selectedTimeframe,
-        signal_type: finalDirection,
-        pattern: patternDesc,
-        probability: adjustedProbability,
-        price: liveData?.price || '0',
-        risk_note: signal.risk,
-        metadata: {
-          figure,
-          news: latestNews,
-          agent_validation: agentValidation,
-          technical_indicators: technicalIndicators,
-          detected_patterns: detectedPatterns,
-          analysis_time_ms: totalAnalysisTime
-        }
-      });
 
-      // Voice synthesis com direção clara
-      if (speakEnabled && enabled && isPlaying && isRunningRef.current) {
-        const urgency = adjustedProbability >= 85 ? 'ALTA CONFIANÇA' :
-                       adjustedProbability >= 75 ? 'Oportunidade forte' :
+      // Voice synthesis ENRIQUECIDA com validação IA + contexto multi-timeframe
+      // Verificar se ainda está ativo antes de falar
+      if (enabled && isPlaying && isRunningRef.current) {
+        const urgency = aiValidation?.recommendation === 'STRONG_BUY' ? 'ALTA URGÊNCIA' :
+                       aiValidation?.recommendation === 'BUY' ? 'Oportunidade forte' :
                        'Oportunidade detectada';
         
+        const aiInsight = aiValidation?.keyPoints?.[0] || data.signal.figure;
+        
+        // Adicionar contexto de timeframes maiores na narração
+        let mtSpeech = '';
+        if (mtContext) {
+          const higherTFs = [];
+          if (mtContext.m5?.trend && mtContext.m5.trend !== 'neutral') higherTFs.push(`M5 ${mtContext.m5.trend}`);
+          if (mtContext.m15?.trend && mtContext.m15.trend !== 'neutral') higherTFs.push(`M15 ${mtContext.m15.trend}`);
+          if (mtContext.m30?.trend && mtContext.m30.trend !== 'neutral') higherTFs.push(`M30 ${mtContext.m30.trend}`);
+          
+          if (higherTFs.length > 0) {
+            mtSpeech = ` Contexto superior: ${higherTFs.join(', ')}.`;
+          }
+        }
+        
         const utterance = new SpeechSynthesisUtterance(
-          `${urgency}! ${selectedPair}: ${finalDirection} validado com ${adjustedProbability}% de confiança. ${patternDesc} detectado a $${liveData?.price}. ${agentValidation.reasoning?.substring(0, 100) || 'Análise completa disponível'}.`
+          `${urgency}! ${selectedPair}: ${data.signal.signal_type} validado pela TradeVision IA com ${data.signal.probability}% de confiança. ${aiInsight}.${mtSpeech} ${aiValidation?.reasoning || 'Análise completa disponível.'}`
         );
         utterance.lang = 'pt-BR';
         utterance.rate = 0.9;
-        utterance.pitch = adjustedProbability >= 85 ? 1.2 : 1.0;
+        utterance.pitch = aiValidation?.recommendation?.includes('STRONG') ? 1.2 : 1.0;
         speechSynthesis.speak(utterance);
       }
 
@@ -381,24 +285,17 @@ export const useNarrator = (
     if (isRunningRef.current) return;
     
     console.log('🎙️ Narrador iniciado');
-    console.log('🔍 Debug - enabled:', enabled);
-    console.log('🔍 Debug - isPlaying:', isPlaying);
-    console.log('🔍 Debug - liveData:', liveData);
-    console.log('🔍 Debug - user:', user);
-    
     isRunningRef.current = true;
     
     // Gerar primeiro sinal imediatamente
     timeoutRef.current = setTimeout(() => {
-      console.log('⏰ Timeout executado - tentando gerar sinal...');
       generateSignal();
     }, 1000);
     
-    // Continuar gerando sinais a cada 30 segundos
+    // Continuar gerando sinais a cada 1 minuto
     intervalRef.current = setInterval(() => {
-      console.log('⏰ Interval executado - tentando gerar sinal...');
       generateSignal();
-    }, 30000);
+    }, 60000);
   };
 
   const stopNarrator = () => {
@@ -433,7 +330,6 @@ export const useNarrator = (
   };
 
   const speakLatest = () => {
-    if (!speakEnabled) return;
     if (feed.length > 0) {
       const latest = feed[0];
       const utterance = new SpeechSynthesisUtterance(

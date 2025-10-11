@@ -82,7 +82,6 @@ export const useMultiExchangeData = (exchange: string = 'binance', pair: string 
   useEffect(() => {
     const fetchHistoricalData = async () => {
       try {
-        console.log('🔍 useMultiExchangeData: Iniciando busca de dados', { exchange, pair, interval });
         setLoading(true);
         
         if (exchange === 'binance') {
@@ -120,18 +119,10 @@ export const useMultiExchangeData = (exchange: string = 'binance', pair: string 
 
   const fetchBinanceData = async () => {
     const symbol = EXCHANGE_PAIRS.binance[pair as keyof typeof EXCHANGE_PAIRS.binance];
-    console.log('🔍 fetchBinanceData: Symbol mapeado', { pair, symbol });
-    if (!symbol) {
-      console.error('❌ fetchBinanceData: Symbol não encontrado para o par', pair);
-      return;
-    }
+    if (!symbol) return;
 
-    const url = `${EXCHANGE_APIS.binance.rest}?symbol=${symbol}&interval=${interval}&limit=500`;
-    console.log('🔍 fetchBinanceData: URL da API', url);
-    
-    const response = await fetch(url);
+    const response = await fetch(`${EXCHANGE_APIS.binance.rest}?symbol=${symbol}&interval=${interval}&limit=500`);
     const data = await response.json();
-    console.log('🔍 fetchBinanceData: Dados recebidos', { dataLength: data.length, firstCandle: data[0] });
     
     const candleData = data.map((kline: any[]) => ({
       time: kline[0],
@@ -142,7 +133,6 @@ export const useMultiExchangeData = (exchange: string = 'binance', pair: string 
       volume: parseFloat(kline[5])
     }));
     
-    console.log('🔍 fetchBinanceData: Candles processados', { candleCount: candleData.length });
     setCandles(candleData);
     
     if (candleData.length > 0) {
@@ -163,16 +153,14 @@ export const useMultiExchangeData = (exchange: string = 'binance', pair: string 
         formattedVolume = volume.toFixed(0);
       }
       
-      const liveDataObj = {
+      setLiveData({
         symbol: pair,
         price: lastCandle.close.toFixed(2),
         change: `${change.startsWith('-') ? '' : '+'}${change}%`,
         volume: formattedVolume,
         timestamp: Date.now(),
         exchange: 'Binance'
-      };
-      console.log('🔍 fetchBinanceData: LiveData definido', liveDataObj);
-      setLiveData(liveDataObj);
+      });
     }
   };
 
@@ -321,34 +309,32 @@ export const useMultiExchangeData = (exchange: string = 'binance', pair: string 
         
         setLastUpdateTime(Date.now());
 
-        // 🔥 ATUALIZAR CANDLES EM TEMPO REAL (não esperar fechar!)
-        setCandles(prev => {
-          const newCandles = [...prev];
-          const newCandle = {
-            time: kline.t,
-            open: parseFloat(kline.o),
-            high: parseFloat(kline.h),
-            low: parseFloat(kline.l),
-            close: parseFloat(kline.c), // Preço atual (em formação)
-            volume: parseFloat(kline.v)
-          };
-          
-          const lastCandle = newCandles[newCandles.length - 1];
-          
-          // Se mesma vela: atualiza (TEMPO REAL!)
-          // Se vela nova (kline.x = true): adiciona
-          if (lastCandle && lastCandle.time === newCandle.time) {
-            newCandles[newCandles.length - 1] = newCandle; // Atualiza em tempo real!
-          } else if (kline.x) {
-            // Só adiciona vela NOVA quando fechar
-            newCandles.push(newCandle);
-            if (newCandles.length > 500) {
-              newCandles.shift();
+        if (kline.x) {
+          setCandles(prev => {
+            const newCandles = [...prev];
+            const newCandle = {
+              time: kline.t,
+              open: parseFloat(kline.o),
+              high: parseFloat(kline.h),
+              low: parseFloat(kline.l),
+              close: parseFloat(kline.c),
+              volume: parseFloat(kline.v)
+            };
+            
+            const lastCandle = newCandles[newCandles.length - 1];
+            
+            if (lastCandle && lastCandle.time === newCandle.time) {
+              newCandles[newCandles.length - 1] = newCandle;
+            } else {
+              newCandles.push(newCandle);
+              if (newCandles.length > 500) {
+                newCandles.shift();
+              }
             }
-          }
-          
-          return newCandles;
-        });
+            
+            return newCandles;
+          });
+        }
       } catch (error) {
         console.error('Error processing WebSocket data:', error);
       }

@@ -104,25 +104,25 @@ export const AgentChat = ({ symbol, onInsightGenerated }: AgentChatProps) => {
       
       // Carregar insights do agente
       const { data: agentData, error: agentError } = await supabase
-        .from('agent_insights' as any)
+        .from('agent_insights')
         .select('*')
         .eq('symbol', symbol)
         .order('timestamp', { ascending: false })
         .limit(50);
 
       if (agentError) throw agentError;
-      setMessages((agentData as any) || []);
+      setMessages(agentData || []);
 
       // Carregar mensagens do narrador
       const { data: narratorData, error: narratorError } = await supabase
-        .from('narrator_output' as any)
+        .from('narrator_output')
         .select('*')
         .eq('symbol', symbol)
         .order('timestamp', { ascending: false })
         .limit(20);
 
       if (narratorError) throw narratorError;
-      setNarratorMessages((narratorData as any) || []);
+      setNarratorMessages(narratorData || []);
 
     } catch (error) {
       console.error('Erro ao carregar mensagens:', error);
@@ -143,7 +143,7 @@ export const AgentChat = ({ symbol, onInsightGenerated }: AgentChatProps) => {
       
       // Salvar insight no banco
       const { data, error } = await supabase
-        .from('agent_insights' as any)
+        .from('agent_insights')
         .insert({
           narrator_id: narratorMessage.id,
           symbol: symbol,
@@ -160,9 +160,8 @@ export const AgentChat = ({ symbol, onInsightGenerated }: AgentChatProps) => {
       if (error) throw error;
       
       console.log('✅ Insight gerado pelo agente:', data);
-      // @ts-ignore
-      setMessages((prev: any) => [(data as any), ...prev]);
-      onInsightGenerated?.(data as any);
+      setMessages(prev => [data, ...prev]);
+      onInsightGenerated?.(data);
       
     } catch (error) {
       console.error('Erro ao processar mensagem do narrador:', error);
@@ -358,7 +357,7 @@ export const AgentChat = ({ symbol, onInsightGenerated }: AgentChatProps) => {
                       <div className="flex flex-wrap gap-1">
                         {Object.entries(message.adjustment_weights).map(([key, value]) => (
                           <Badge key={key} variant="outline" className="text-xs">
-                            {key}: {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                            {key}: {typeof value === 'object' ? JSON.stringify(value) : value}
                           </Badge>
                         ))}
                       </div>

@@ -13,9 +13,7 @@ export interface TechnicalIndicators {
   // EMAs
   ema9: number;
   ema20: number;
-  ema21: number;
   ema50: number;
-  ema100: number;
   ema200: number;
   
   // MACD
@@ -42,16 +40,9 @@ export interface TechnicalIndicators {
 
 export const useTechnicalIndicators = (candles: Candle[]) => {
   return useMemo(() => {
-    console.log('🔍 useTechnicalIndicators: Candles recebidos', { candleCount: candles?.length });
+    if (candles.length < 200) return null; // Precisa de dados suficientes
     
-    if (!candles || candles.length < 50) {
-      console.log('⚠️ useTechnicalIndicators: Dados insuficientes', { candleCount: candles?.length });
-      return null; // Reduzido de 200 para 50 para funcionar com menos dados
-    }
-    
-    const indicators = calculateIndicators(candles);
-    console.log('✅ useTechnicalIndicators: Indicadores calculados', indicators);
-    return indicators;
+    return calculateIndicators(candles);
   }, [candles]);
 };
 
@@ -194,9 +185,7 @@ function calculateIndicators(candles: Candle[]): TechnicalIndicators {
   
   const ema9 = calculateEMA(closes, 9);
   const ema20 = calculateEMA(closes, 20);
-  const ema21 = calculateEMA(closes, 21);
   const ema50 = calculateEMA(closes, 50);
-  const ema100 = calculateEMA(closes, 100);
   const ema200 = calculateEMA(closes, 200);
   
   const { macd, signal, histogram } = calculateMACD(closes);
@@ -219,9 +208,7 @@ function calculateIndicators(candles: Candle[]): TechnicalIndicators {
   return {
     ema9,
     ema20,
-    ema21,
     ema50,
-    ema100,
     ema200,
     macd,
     macdSignal: signal,

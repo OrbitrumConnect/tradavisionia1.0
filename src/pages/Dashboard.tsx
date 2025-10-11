@@ -1,6 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import ReactMarkdown from 'react-markdown';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -25,7 +24,6 @@ import { PerformanceDashboard } from '@/components/analytics/PerformanceDashboar
 import { NarratorPerformance } from '@/components/analytics/NarratorPerformance';
 import { LearningProgress } from '@/components/analytics/LearningProgress';
 import { LearningDashboard } from '@/components/analytics/LearningDashboard';
-import InteractiveChart from '@/components/analytics/InteractiveChart';
 import { useTechnicalIndicators, Candle } from '@/hooks/useTechnicalIndicators';
 import { usePatternDetection } from '@/hooks/usePatternDetection';
 import { useFeatureStore } from '@/hooks/useFeatureStore';
@@ -49,13 +47,12 @@ const Dashboard = ({ onLogout, onBackToLanding }: DashboardProps) => {
   // Multi-exchange real-time data
   const [selectedExchange, setSelectedExchange] = useState('binance');
   const [selectedPair, setSelectedPair] = useState('BTC/USDT');
-  const [selectedTimeframe, setSelectedTimeframe] = useState('3m'); // M3 para melhor precisão
+  const [selectedTimeframe, setSelectedTimeframe] = useState('1m');
   const { candles, liveData, isConnected, loading, availablePairs, availableTimeframes, exchanges, lastUpdateTime } = useMultiExchangeData(selectedExchange, selectedPair, selectedTimeframe);
   
   // States
   // Removido soundEnabled - usando apenas narratorEnabled
   const [narratorEnabled, setNarratorEnabled] = useState(true);
-  const [voiceEnabled, setVoiceEnabled] = useState(true);
   // Capital management states
   const [capital, setCapital] = useState('');
   const [tradeAmount, setTradeAmount] = useState('');
@@ -105,25 +102,18 @@ const Dashboard = ({ onLogout, onBackToLanding }: DashboardProps) => {
     selectedPair, 
     selectedTimeframe,
     technicalIndicators, // 🧠 Passa indicadores
-    patterns,            // 🧠 Passa padrões detectados
-    voiceEnabled         // 🎙️ Controle de voz
+    patterns              // 🧠 Passa padrões detectados
   );
 
   // Iniciar narrador automaticamente quando tudo estiver pronto
   useEffect(() => {
-    console.log('🔍 Debug Dashboard - narratorEnabled:', narratorEnabled);
-    console.log('🔍 Debug Dashboard - liveData:', liveData);
-    console.log('🔍 Debug Dashboard - narrator.isPlaying:', narrator.isPlaying);
-    console.log('🔍 Debug Dashboard - technicalIndicators:', technicalIndicators);
-    console.log('🔍 Debug Dashboard - patterns:', patterns);
-    
     if (narratorEnabled && liveData && !narrator.isPlaying) {
       console.log('🚀 Iniciando narrador automaticamente...');
       setTimeout(() => {
         narrator.toggle(); // Iniciar automaticamente
       }, 3000); // Aguardar 3 segundos para carregar dados
     }
-  }, [narratorEnabled, liveData, narrator.isPlaying, technicalIndicators, patterns]);
+  }, [narratorEnabled, liveData, narrator.isPlaying]);
 
   // Salvar features periodicamente (a cada novo candle)
   useEffect(() => {
@@ -252,22 +242,7 @@ const Dashboard = ({ onLogout, onBackToLanding }: DashboardProps) => {
 
   // Atualizar MarketContext em tempo real para o Agente IA
   useEffect(() => {
-    if (!liveData || candles.length < 10) return;
-
-    // Calcular volatilidade (ATR simplificado)
-    const volatility = candles.length >= 14 
-      ? candles.slice(-14).reduce((sum, c) => sum + (c.high - c.low), 0) / 14 
-      : 0;
-
-    // Calcular momentum (taxa de mudança de preço)
-    const momentum = candles.length >= 10
-      ? ((candles[candles.length - 1].close - candles[candles.length - 10].close) / candles[candles.length - 10].close) * 100
-      : 0;
-
-    // Determinar tendência
-    const trend = marketPressure === 'OTIMISTA' ? 'ALTISTA' 
-                : marketPressure === 'PESSIMISTA' ? 'BAIXISTA' 
-                : 'LATERAL';
+    if (!liveData) return;
 
     marketContext.updateMarketData({
       symbol: selectedPair,
@@ -276,17 +251,8 @@ const Dashboard = ({ onLogout, onBackToLanding }: DashboardProps) => {
       fearGreedIndex,
       buyerDominance,
       marketPressure,
-      // 🆕 Status do Dia
-      volatility: Math.round(volatility * 100) / 100,
-      volume: liveData.volume || '0',
-      trend,
-      momentum: Math.round(momentum * 100) / 100,
-      // 🆕 Dados Técnicos
-      technicalIndicators,
-      patterns,
-      candles: candles.slice(-50), // Últimos 50 candles
     });
-  }, [liveData?.price, selectedPair, selectedTimeframe, fearGreedIndex, buyerDominance, marketPressure]); // Removido candles, technicalIndicators, patterns para evitar loop
+  }, [liveData, selectedPair, selectedTimeframe, fearGreedIndex, buyerDominance, marketPressure]);
 
   // Salvar sinais do narrador no banco para o Admin Dashboard coletar (evitar duplicados)
   const [lastSavedSignal, setLastSavedSignal] = useState<string | null>(null);
@@ -694,7 +660,8 @@ const Dashboard = ({ onLogout, onBackToLanding }: DashboardProps) => {
             </div>
             
             <div className="flex items-center gap-3">
-              {/* Controle do Narrador */}
+              {/* Removido botão Som separado - usando apenas controle do Narrador */}
+              
               <Button
                 variant="outline"
                 size="sm"
@@ -704,34 +671,11 @@ const Dashboard = ({ onLogout, onBackToLanding }: DashboardProps) => {
                 Narrador {narratorEnabled ? 'ON' : 'OFF'}
               </Button>
 
-              {/* Controle de Voz */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  // Parar voz imediatamente
-                  if (typeof speechSynthesis !== 'undefined') {
-                    speechSynthesis.cancel();
-                  }
-                  setVoiceEnabled(!voiceEnabled);
-                }}
-                disabled={!narratorEnabled}
-              >
-                <Volume2 className="h-4 w-4" />
-                Voz {voiceEnabled ? 'ON' : 'OFF'}
-              </Button>
-
               {narratorEnabled && (
                 <Button
                   variant={narrator.isPlaying ? "danger" : "default"}
                   size="sm"
-                  onClick={() => {
-                    // Se está tocando, parar voz imediatamente
-                    if (narrator.isPlaying && typeof speechSynthesis !== 'undefined') {
-                      speechSynthesis.cancel();
-                    }
-                    narrator.toggle();
-                  }}
+                  onClick={narrator.toggle}
                 >
                   {narrator.isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                   {narrator.isPlaying ? 'STOP' : 'PLAY'}
@@ -1487,32 +1431,6 @@ const Dashboard = ({ onLogout, onBackToLanding }: DashboardProps) => {
 
           {/* Right Column - Controls & Analysis - COMPACTO */}
           <div className="col-span-1 space-y-3"> {/* 1 coluna compacta */}
-            {/* Interactive Chart */}
-            <Card className="bg-card/80 border-border/50">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4" />
-                  Gráfico Interativo
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-3">
-                <InteractiveChart 
-                  symbol={selectedPair.replace('/', '')} 
-                  timeframe={selectedTimeframe}
-                  onDataCapture={(data) => {
-                    // Dados capturados silenciosamente para análise
-                  }}
-                  onPeriodSelect={(startTime, endTime) => {
-                    console.log('📅 Período selecionado:', { startTime, endTime });
-                    toast({
-                      title: "📅 Período Selecionado",
-                      description: `Análise de ${new Date(startTime * 1000).toLocaleString()} até ${new Date(endTime * 1000).toLocaleString()}`,
-                    });
-                  }}
-                />
-              </CardContent>
-            </Card>
-
             {/* Financial Management */}
             <Card className="bg-card/80 border-border/50">
               <CardHeader>
@@ -1823,22 +1741,18 @@ const Dashboard = ({ onLogout, onBackToLanding }: DashboardProps) => {
                      narrator.feed.map((signal, index) => (
                        <div key={index} className="p-3 bg-muted/20 rounded-lg border-l-4 border-primary/30">
                          <div className="space-y-2">
-                           <div className="text-sm font-semibold prose prose-invert prose-sm max-w-none">
-                             📰 <ReactMarkdown>{signal.news}</ReactMarkdown>
-                           </div>
-                           <div className="text-sm prose prose-invert prose-sm max-w-none">
-                             <ReactMarkdown>
-{`**${signal.symbol} ${signal.timeframe}:** ${signal.type} - ${signal.pattern}
-
-**Probabilidade:** ${signal.probability}% | **24h:** ${signal.pairData?.change24h} | **Vol:** ${signal.pairData?.vol}
-
-📊 ${signal.marketStatus}
-
-**Figura:** ${signal.figure}
-
-⚠️ **${signal.risk}**`}
-                             </ReactMarkdown>
-                           </div>
+                           <p className="text-sm font-semibold">
+                             📰 {signal.news}
+                           </p>
+                           <p className="text-sm">
+                             <strong>{signal.symbol} {signal.timeframe}:</strong> {signal.type} - {signal.pattern}<br/>
+                             <span className="text-primary">Probabilidade: {signal.probability}%</span> | 
+                             <span className="text-success ml-1">24h: {signal.pairData?.change24h}</span> | 
+                             <span className="text-muted-foreground ml-1">Vol: {signal.pairData?.vol}</span><br/>
+                             <span className="text-muted-foreground">📊 {signal.marketStatus}</span><br/>
+                             <span className="text-muted-foreground">Figura: {signal.figure}</span><br/>
+                             <span className="text-warning text-xs">⚠️ {signal.risk}</span>
+                           </p>
                            <span className="text-xs text-muted-foreground">{signal.timestamp}</span>
                          </div>
                        </div>
@@ -1865,7 +1779,7 @@ const Dashboard = ({ onLogout, onBackToLanding }: DashboardProps) => {
                       <Button 
                         variant="outline" 
                         size="sm"
-                        disabled={!narratorEnabled || !voiceEnabled || narrator.feed.length === 0}
+                        disabled={!narratorEnabled || narrator.feed.length === 0}
                         onClick={narrator.speakLatest}
                       >
                         <Volume2 className="h-4 w-4 mr-2" />
