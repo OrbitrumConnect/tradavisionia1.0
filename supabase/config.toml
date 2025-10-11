@@ -1,5 +1,8 @@
 project_id = "krjpvdllsbxeuuncmitt"
 
+[functions.auto-trader]
+verify_jwt = false
+
 [functions.signal-validator]
 verify_jwt = false
 

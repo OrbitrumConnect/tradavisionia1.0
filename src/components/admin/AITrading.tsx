@@ -4,13 +4,14 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMultiExchangeData } from '@/hooks/useMultiExchangeData';
 import { useTechnicalIndicators } from '@/hooks/useTechnicalIndicators';
 import { usePatternDetection } from '@/hooks/usePatternDetection';
-// import InteractiveChart from '@/components/analytics/InteractiveChart';
+import ProfessionalChart from '@/components/analytics/ProfessionalChart';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -49,13 +50,14 @@ interface AITradingProps {
 export function AITrading({ symbol = 'BTC/USDT' }: AITradingProps) {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [selectedTimeframe] = useState('1m'); // M1 para scalping
-  const { candles, liveData, isConnected } = useMultiExchangeData('binance', symbol, selectedTimeframe);
+  const [selectedSymbol, setSelectedSymbol] = useState(symbol);
+  const [selectedTimeframe, setSelectedTimeframe] = useState('1m'); // M1 para scalping
+  const { candles, liveData, isConnected, availablePairs, availableTimeframes } = useMultiExchangeData('binance', selectedSymbol, selectedTimeframe);
   
   // 🔍 DEBUG: Verificar dados recebidos
   useEffect(() => {
     console.log('🔍 AI Trading - Status:', {
-      symbol,
+      symbol: selectedSymbol,
       timeframe: selectedTimeframe,
       candlesCount: candles.length,
       isConnected,
@@ -63,7 +65,7 @@ export function AITrading({ symbol = 'BTC/USDT' }: AITradingProps) {
       firstCandle: candles[0],
       lastCandle: candles[candles.length - 1]
     });
-  }, [candles.length, isConnected, liveData]);
+  }, [candles.length, isConnected, liveData, selectedSymbol, selectedTimeframe]);
   
   const formattedCandles = candles.map(c => ({
     open: c.open,
@@ -401,7 +403,7 @@ export function AITrading({ symbol = 'BTC/USDT' }: AITradingProps) {
 
 ⏰ HORA BRASIL: ${brazilTime}
 📊 DADOS ATUAIS:
-- Par: ${symbol}
+- Par: ${selectedSymbol}
 - Preço: $${currentPrice.toFixed(2)}
 - RSI: ${technicalIndicators.rsi14?.toFixed(1) || 'N/A'}
 - MACD: ${technicalIndicators.macdHistogram?.toFixed(4) || 'N/A'}
@@ -573,7 +575,7 @@ ${trade.result === 'WIN'
       const tradeData = {
         id: trade.id,
         user_id: user?.id,
-        symbol: symbol,
+        symbol: selectedSymbol,
         timeframe: selectedTimeframe,
         // 🆕 Usar novos campos com tipos corretos
         type: trade.type,                   // BUY/SELL
@@ -873,9 +875,49 @@ ${trade.result === 'WIN'
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
+        {/* 🆕 Seletores de Par e Timeframe - Estilo Dashboard Profissional */}
+        <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
+          <div className="flex items-center gap-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-gray-400 font-semibold">PAR:</label>
+              <Select value={selectedSymbol} onValueChange={setSelectedSymbol}>
+                <SelectTrigger className="w-[150px] h-10 bg-slate-800 border-slate-600 text-white font-mono">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {availablePairs.map(pair => (
+                    <SelectItem key={pair} value={pair}>{pair}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-gray-400 font-semibold">TIMEFRAME:</label>
+              <Select value={selectedTimeframe} onValueChange={setSelectedTimeframe}>
+                <SelectTrigger className="w-[130px] h-10 bg-slate-800 border-slate-600 text-white font-mono">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableTimeframes.map(tf => (
+                    <SelectItem key={tf} value={tf}>{tf.toUpperCase()}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-gray-400 font-semibold">STATUS:</label>
+              <Badge className={isConnected ? "bg-green-500/20 text-green-400 border-green-500/30 px-4 py-2" : "bg-yellow-500/20 text-yellow-400 border-yellow-500/30 px-4 py-2"}>
+                {isConnected ? '✅ Conectado' : '⏳ Conectando...'}
+              </Badge>
+            </div>
+          </div>
+        </div>
+
         <div>
           <h2 className="text-3xl font-bold text-white">Gráfico x I.A</h2>
-          <p className="text-gray-400">TradeVision IA executando trades automáticos a cada 1 minuto</p>
+          <p className="text-gray-400">TradeVision IA executando trades automáticos a cada 3 minutos</p>
           <p className="text-sm text-green-400">🚀 Sistema 100% automático - BUY/SELL baseado em análise técnica</p>
           <p className="text-xs text-blue-400 mt-1">
             💡 Trades simulados (Paper Trading) | Dados salvos no banco | IA aprende continuamente
@@ -1031,7 +1073,7 @@ ${trade.result === 'WIN'
       {/* Gráfico */}
       <div className="space-y-4">
         <div className="flex items-center gap-3">
-          <h3 className="text-xl font-bold text-white">📊 {symbol} - M1 (Scalping)</h3>
+          <h3 className="text-xl font-bold text-white">📊 {selectedSymbol} - {selectedTimeframe.toUpperCase()}</h3>
           <Badge variant="outline" className={`${isConnected ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
             {isConnected ? 'Conectado' : 'Desconectado'}
           </Badge>
@@ -1055,7 +1097,7 @@ ${trade.result === 'WIN'
             <div className="text-center">
               <Activity className="h-12 w-12 mx-auto mb-4 text-blue-400 animate-pulse" />
               <p className="text-gray-200 font-semibold mb-2">Carregando gráfico em tempo real...</p>
-              <p className="text-sm text-gray-400">Conectando com Binance M1 - {symbol}</p>
+              <p className="text-sm text-gray-400">Conectando com Binance {selectedTimeframe.toUpperCase()} - {selectedSymbol}</p>
               <div className="mt-4 px-4 py-2 bg-slate-700/50 rounded text-xs max-w-sm mx-auto">
                 <p className={isConnected ? 'text-green-400' : 'text-yellow-400'}>
                   {isConnected ? '✅ Conectado à Binance WebSocket' : '⏳ Estabelecendo conexão...'}
@@ -1078,7 +1120,7 @@ ${trade.result === 'WIN'
               {/* Header do Gráfico */}
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-4">
-                  <span className="text-white font-bold">{symbol}</span>
+                  <span className="text-white font-bold">{selectedSymbol}</span>
                   <span className="text-green-400 font-mono text-lg">
                     ${liveData?.price || '0.00'}
                   </span>
@@ -1092,278 +1134,31 @@ ${trade.result === 'WIN'
                 </div>
               </div>
 
-              {/* Gráfico REAL de Velas - Igual Dashboard Home */}
-              <div className="flex-1 bg-gradient-to-br from-slate-900 to-slate-800 rounded border border-slate-600 relative overflow-hidden">
-                {/* Real-Time Chart with Live Data - IGUAL DASHBOARD HOME */}
-                <div className="h-full bg-gradient-to-t from-blue-500/5 to-transparent rounded border-l-2 border-b-2 border-slate-500/20 relative">
-                  
-                  {/* Real Candlestick visualization with Animation - KEY atualiza em tempo real */}
-                  <div className="absolute inset-2" key={`${Date.now()}-${candles.length}`}>
-                    {candles.slice(-35).map((candle, index) => { // Mostrar 35 velas
-                      const isGreen = candle.close > candle.open;
-                      
-                      // Usar TODOS os candles para calcular range, não apenas os 35 visíveis
-                      const allCandles = candles;
-                      const basePrice = Math.min(...allCandles.map(c => c.low));
-                      const maxPrice = Math.max(...allCandles.map(c => c.high));
-                      const priceRange = maxPrice - basePrice || 1;
-                      
-                      // Calculate positions based on price data - AJUSTE DINÂMICO
-                      const chartHeight = 360; // 🆕 Aumentado de 280 para 360 (+28%)
-                      const wickTop = ((candle.high - basePrice) / priceRange) * chartHeight;
-                      const wickBottom = ((candle.low - basePrice) / priceRange) * chartHeight;
-                      const bodyTop = ((Math.max(candle.open, candle.close) - basePrice) / priceRange) * chartHeight;
-                      const bodyBottom = ((Math.min(candle.open, candle.close) - basePrice) / priceRange) * chartHeight;
-                      
-                      return (
-                        <div
-                          key={`${candle.time}-${index}`}
-                          className={`absolute transition-all duration-300 ease-in-out group ${
-                            index >= candles.slice(-35).length - 3 ? 'animate-pulse' : ''
-                          }`}
-                          style={{
-                            left: `${(index / 34) * 92}%`,
-                            bottom: '12%',
-                            width: '2.2%',
-                            zIndex: 1
-                          }}
-                        >
-                          {/* High-Low Wick */}
-                          <div 
-                            className={`absolute left-1/2 transform -translate-x-1/2 w-0.5 transition-all duration-300 ${
-                              isGreen ? 'bg-green-500' : 'bg-red-500'
-                            }`}
-                            style={{ 
-                              height: `${Math.max(1, wickTop - wickBottom)}px`,
-                              bottom: `${wickBottom}px`
-                            }}
-                          />
-                          
-                          {/* Candle Body */}
-                          <div 
-                            className={`absolute left-1/2 transform -translate-x-1/2 w-full transition-all duration-300 rounded-sm ${
-                              isGreen 
-                                ? 'bg-green-500 border border-green-400/50' 
-                                : 'bg-red-500 border border-red-400/50'
-                            } ${index === candles.slice(-35).length - 1 ? 'animate-pulse shadow-lg' : ''}`}
-                            style={{ 
-                              height: `${Math.max(2, bodyTop - bodyBottom)}px`,
-                              bottom: `${bodyBottom}px`,
-                              opacity: 0.7 + (index / 35) * 0.3,
-                              boxShadow: index === candles.slice(-35).length - 1 ? `0 0 8px ${isGreen ? '#10b981' : '#ef4444'}` : 'none'
-                            }}
-                          />
-                          
-                          {/* Price tooltip on hover */}
-                          <div className="absolute -top-16 left-1/2 transform -translate-x-1/2 bg-slate-800/95 backdrop-blur-sm px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap border border-slate-600/50 z-10">
-                            <div className="text-center">
-                              <div className={`font-semibold ${isGreen ? 'text-green-400' : 'text-red-400'}`}>
-                                Close: {candle.close.toFixed(2)}
-                              </div>
-                              <div className="text-gray-400 text-xs">
-                                High: {candle.high.toFixed(2)}<br/>
-                                Low: {candle.low.toFixed(2)}<br/>
-                                Open: {candle.open.toFixed(2)}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  
-                  {/* Linha Amarela - Preço Real Atual */}
-                  {liveData && candles.length > 0 && (
-                    <div 
-                      className="absolute transition-all duration-200 ease-out z-20"
-                      style={{ 
-                        bottom: `${(() => {
-                          const currentPrice = parseFloat(liveData.price.replace(/,/g, ''));
-                          // Usar TODOS os candles para range dinâmico
-                          const allCandles = candles;
-                          const basePrice = Math.min(...allCandles.map(c => c.low));
-                          const maxPrice = Math.max(...allCandles.map(c => c.high));
-                          const priceRange = maxPrice - basePrice || 1;
-                          
-                          const normalizedPosition = (currentPrice - basePrice) / priceRange;
-                          const chartHeight = 360;
-                          const bottomOffset = 50;
-                          
-                          const realPosition = normalizedPosition * chartHeight + bottomOffset;
-                          return Math.max(50, Math.min(realPosition, 350));
-                        })()}px`,
-                        width: '92%',
-                        left: '4%',
-                        height: '2px',
-                        backgroundColor: '#fbbf24',
-                        boxShadow: '0 0 8px #fbbf24'
-                      }}
-                    >
-                      {/* Preço atual flutuante */}
-                      <div 
-                        className="absolute -top-8 left-0 bg-yellow-500 text-black px-2 py-1 rounded text-xs font-bold"
-                        style={{ transform: 'translateX(-50%)' }}
-                      >
-                        ${liveData.price}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* LINHAS DE TRADING - Entrada, Take Profit, Stop Loss */}
-                  {currentPosition && liveData && candles.length > 0 && (
-                    <>
-                      {/* Linha de ENTRADA (Azul) */}
-                      <div 
-                        className="absolute transition-all duration-200 ease-out z-25"
-                        style={{ 
-                          bottom: `${(() => {
-                            const entryPrice = currentPosition.entryPrice;
-                            // Usar TODOS os candles para range dinâmico
-                            const allCandles = candles;
-                            const basePrice = Math.min(...allCandles.map(c => c.low));
-                            const maxPrice = Math.max(...allCandles.map(c => c.high));
-                            const priceRange = maxPrice - basePrice || 1;
-                            
-                            const normalizedPosition = (entryPrice - basePrice) / priceRange;
-                            const chartHeight = 360;
-                            const bottomOffset = 50;
-                            
-                            const realPosition = normalizedPosition * chartHeight + bottomOffset;
-                            return Math.max(50, Math.min(realPosition, 350));
-                          })()}px`,
-                          width: '92%',
-                          left: '4%',
-                          height: '3px',
-                          backgroundColor: '#3b82f6',
-                          boxShadow: '0 0 6px #3b82f6',
-                          borderTop: '2px dashed #60a5fa',
-                          borderBottom: '2px dashed #60a5fa'
-                        }}
-                      >
-                        <div 
-                          className="absolute -top-8 left-0 bg-blue-500 text-white px-2 py-1 rounded text-xs font-bold"
-                          style={{ transform: 'translateX(-50%)' }}
-                        >
-                          ENTRADA: ${currentPosition.entryPrice.toFixed(2)}
-                        </div>
-                      </div>
-
-                      {/* Linha de TAKE PROFIT (Verde) */}
-                      <div 
-                        className="absolute transition-all duration-200 ease-out z-25"
-                        style={{ 
-                          bottom: `${(() => {
-                            const takeProfitPrice = currentPosition.takeProfit;
-                            // Usar TODOS os candles para range dinâmico
-                            const allCandles = candles;
-                            const basePrice = Math.min(...allCandles.map(c => c.low));
-                            const maxPrice = Math.max(...allCandles.map(c => c.high));
-                            const priceRange = maxPrice - basePrice || 1;
-                            
-                            const normalizedPosition = (takeProfitPrice - basePrice) / priceRange;
-                            const chartHeight = 360;
-                            const bottomOffset = 50;
-                            
-                            const realPosition = normalizedPosition * chartHeight + bottomOffset;
-                            return Math.max(50, Math.min(realPosition, 350));
-                          })()}px`,
-                          width: '92%',
-                          left: '4%',
-                          height: '3px',
-                          backgroundColor: '#10b981',
-                          boxShadow: '0 0 6px #10b981',
-                          borderTop: '2px solid #34d399',
-                          borderBottom: '2px solid #34d399'
-                        }}
-                      >
-                        <div 
-                          className="absolute -top-8 left-0 bg-green-500 text-white px-2 py-1 rounded text-xs font-bold"
-                          style={{ transform: 'translateX(-50%)' }}
-                        >
-                          TP: ${currentPosition.takeProfit.toFixed(2)}
-                        </div>
-                      </div>
-
-                      {/* Linha de STOP LOSS (Vermelho) */}
-                      <div 
-                        className="absolute transition-all duration-200 ease-out z-25"
-                        style={{ 
-                          bottom: `${(() => {
-                            const stopLossPrice = currentPosition.stopLoss;
-                            // Usar TODOS os candles para range dinâmico
-                            const allCandles = candles;
-                            const basePrice = Math.min(...allCandles.map(c => c.low));
-                            const maxPrice = Math.max(...allCandles.map(c => c.high));
-                            const priceRange = maxPrice - basePrice || 1;
-                            
-                            const normalizedPosition = (stopLossPrice - basePrice) / priceRange;
-                            const chartHeight = 360;
-                            const bottomOffset = 50;
-                            
-                            const realPosition = normalizedPosition * chartHeight + bottomOffset;
-                            return Math.max(50, Math.min(realPosition, 350));
-                          })()}px`,
-                          width: '92%',
-                          left: '4%',
-                          height: '3px',
-                          backgroundColor: '#ef4444',
-                          boxShadow: '0 0 6px #ef4444',
-                          borderTop: '2px solid #f87171',
-                          borderBottom: '2px solid #f87171'
-                        }}
-                      >
-                        <div 
-                          className="absolute -top-8 left-0 bg-red-500 text-white px-2 py-1 rounded text-xs font-bold"
-                          style={{ transform: 'translateX(-50%)' }}
-                        >
-                          SL: ${currentPosition.stopLoss.toFixed(2)}
-                        </div>
-                      </div>
-                    </>
-                  )}
-                  
-                  {/* Grid de preços */}
-                  <div className="absolute inset-0 opacity-20">
-                    {[...Array(5)].map((_, i) => (
-                      <div key={i} className="absolute w-full border-t border-slate-500" 
-                           style={{ top: `${20 + i * 20}%` }} />
-                    ))}
-                    {[...Array(8)].map((_, i) => (
-                      <div key={i} className="absolute h-full border-l border-slate-500" 
-                           style={{ left: `${12.5 + i * 12.5}%` }} />
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Informações Adicionais */}
-              <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
-                <div className="bg-slate-800 p-3 rounded">
-                  <p className="text-gray-400">Último Candle</p>
-                  <p className="text-white font-bold">
-                    O: {candles[candles.length - 1]?.open?.toFixed(2) || '0.00'}
-                  </p>
-                  <p className="text-white font-bold">
-                    C: {candles[candles.length - 1]?.close?.toFixed(2) || '0.00'}
-                  </p>
-                </div>
-                <div className="bg-slate-800 p-3 rounded">
-                  <p className="text-gray-400">Alta/Baixa</p>
-                  <p className="text-white font-bold">
-                    H: {candles[candles.length - 1]?.high?.toFixed(2) || '0.00'}
-                  </p>
-                  <p className="text-white font-bold">
-                    L: {candles[candles.length - 1]?.low?.toFixed(2) || '0.00'}
-                  </p>
-                </div>
-                <div className="bg-slate-800 p-3 rounded">
-                  <p className="text-gray-400">Padrões</p>
-                  <p className="text-white font-bold">
-                    {patterns && Object.keys(patterns).length > 0 
-                      ? Object.keys(patterns).join(', ') 
-                      : 'Nenhum'}
-                  </p>
-                </div>
+              {/* 🎯 GRÁFICO PROFISSIONAL COM ZOOM E NAVEGAÇÃO */}
+              <div className="flex-1">
+                <ProfessionalChart
+                  symbol={selectedSymbol}
+                  timeframe={selectedTimeframe}
+                  candles={candles.map(candle => ({
+                    timestamp: candle.time,
+                    open: candle.open,
+                    high: candle.high,
+                    low: candle.low,
+                    close: candle.close,
+                    volume: candle.volume || 0
+                  }))}
+                  currentPrice={liveData ? parseFloat(liveData.price.replace(/,/g, '')) : undefined}
+                  trades={currentPosition ? [{
+                    type: currentPosition.type,
+                    entryPrice: currentPosition.entryPrice,
+                    stopLoss: currentPosition.stopLoss,
+                    takeProfit: currentPosition.takeProfit,
+                    timestamp: currentPosition.timestamp
+                  }] : []}
+                  onDataCapture={(data) => {
+                    console.log('📊 Dados capturados do gráfico:', data);
+                  }}
+                />
               </div>
             </div>
           </div>
