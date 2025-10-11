@@ -51,6 +51,19 @@ export function AITrading({ symbol = 'BTC/USDT' }: AITradingProps) {
   const [selectedTimeframe] = useState('1m'); // M1 para scalping
   const { candles, liveData, isConnected } = useMultiExchangeData('binance', symbol, selectedTimeframe);
   
+  // 🔍 DEBUG: Verificar dados recebidos
+  useEffect(() => {
+    console.log('🔍 AI Trading - Status:', {
+      symbol,
+      timeframe: selectedTimeframe,
+      candlesCount: candles.length,
+      isConnected,
+      hasLiveData: !!liveData,
+      firstCandle: candles[0],
+      lastCandle: candles[candles.length - 1]
+    });
+  }, [candles.length, isConnected, liveData]);
+  
   const formattedCandles = candles.map(c => ({
     open: c.open,
     high: c.high,
@@ -967,9 +980,23 @@ ${trade.result === 'WIN'
         {candles.length === 0 ? (
           <div className="h-[500px] flex items-center justify-center bg-slate-800 rounded-lg border border-slate-700">
             <div className="text-center">
-              <Activity className="h-12 w-12 mx-auto mb-4 text-gray-400 animate-pulse" />
-              <p className="text-gray-400">Carregando gráfico em tempo real...</p>
-              <p className="text-sm text-gray-500 mt-2">Conectando com Binance M1</p>
+              <Activity className="h-12 w-12 mx-auto mb-4 text-blue-400 animate-pulse" />
+              <p className="text-gray-200 font-semibold mb-2">Carregando gráfico em tempo real...</p>
+              <p className="text-sm text-gray-400">Conectando com Binance M1 - {symbol}</p>
+              <div className="mt-4 px-4 py-2 bg-slate-700/50 rounded text-xs max-w-sm mx-auto">
+                <p className={isConnected ? 'text-green-400' : 'text-yellow-400'}>
+                  {isConnected ? '✅ Conectado à Binance WebSocket' : '⏳ Estabelecendo conexão...'}
+                </p>
+                <p className="text-gray-400 mt-1">
+                  {liveData ? `📊 Preço atual: $${liveData.price}` : '⏳ Aguardando primeiro tick de preço...'}
+                </p>
+                <p className="text-gray-500 mt-1">
+                  Candles carregados: {candles.length} (aguardando mínimo de 50)
+                </p>
+              </div>
+              <p className="text-xs text-gray-600 mt-4">
+                💡 Abra o console (F12) para ver logs técnicos detalhados
+              </p>
             </div>
           </div>
         ) : (
