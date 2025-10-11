@@ -181,15 +181,16 @@ export function AITrading({ symbol = 'BTC/USDT' }: AITradingProps) {
           // Converter trades do banco para formato local
           const loadedTrades: Trade[] = savedTrades.map((t: any) => ({
             id: t.id,
-            type: t.type,
-            entryPrice: t.entry_price,
-            exitPrice: t.exit_price || undefined,
-            exitTime: t.exit_time || undefined,
-            stopLoss: t.stop_loss,
-            takeProfit: t.take_profit,
-            size: t.size,
+            // 🆕 Priorizar campos NUMERIC (se existirem), fallback para TEXT
+            type: t.type || t.trade_type,
+            entryPrice: t.entry_price_num || (t.entry_price ? parseFloat(t.entry_price) : 0),
+            exitPrice: t.exit_price_num || (t.exit_price ? parseFloat(t.exit_price) : undefined),
+            exitTime: t.exit_time || t.exit_timestamp || undefined,
+            stopLoss: t.stop_loss_num || (t.stop_loss ? parseFloat(t.stop_loss) : 0),
+            takeProfit: t.take_profit_num || (t.take_profit ? parseFloat(t.take_profit) : 0),
+            size: t.size_num || (t.size ? parseFloat(t.size) : 0),
             leverage: t.leverage,
-            timestamp: t.created_at,
+            timestamp: t.timestamp || t.created_at,
             status: t.status,
             result: t.result || undefined,
             pnl: t.pnl || undefined,
@@ -560,12 +561,21 @@ ${trade.result === 'WIN'
         user_id: user?.id,
         symbol: symbol,
         timeframe: selectedTimeframe,
+        // 🆕 Usar novos campos com tipos corretos
+        type: trade.type,                   // BUY/SELL
+        entry_price_num: trade.entryPrice,  // NUMERIC
+        exit_price_num: trade.exitPrice || null,
+        stop_loss_num: trade.stopLoss,
+        take_profit_num: trade.takeProfit,
+        size_num: trade.size,
+        // Legacy (manter compatibilidade)
         trade_type: trade.type,
         entry_price: trade.entryPrice.toString(),
         exit_price: trade.exitPrice?.toString() || null,
         stop_loss: trade.stopLoss.toString(),
         take_profit: trade.takeProfit.toString(),
         size: trade.size.toString(),
+        // Outros campos
         leverage: trade.leverage,
         status: trade.status,
         result: trade.result || null,
@@ -573,14 +583,15 @@ ${trade.result === 'WIN'
         reason: trade.reason,
         action: action,
         timestamp: trade.timestamp,
-        exit_timestamp: trade.exitTime || null,
+        exit_time: trade.exitTime || null,      // 🆕 Usar exit_time
+        exit_timestamp: trade.exitTime || null, // Legacy
         brazil_time: brazilTime,
         technical_context: JSON.stringify({
           rsi: technicalIndicators?.rsi14,
           macd: technicalIndicators?.macdHistogram,
           ema20: technicalIndicators?.ema20,
-               ema50: technicalIndicators?.ema50,
-          patterns: patterns
+          ema50: technicalIndicators?.ema50,
+          patterns: patterns // 🆕 Inclui TODOS os 24 padrões!
         })
       };
 
