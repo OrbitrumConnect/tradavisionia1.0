@@ -337,6 +337,58 @@ class TradeVisionAI {
     return signals || [];
   }
 
+  // 🆕 Buscar trades recentes para aprendizado
+  async getRecentTrades(userId: string, limit: number = 20): Promise<any[]> {
+    const { data } = await this.supabase
+      .from('ai_trades')
+      .select('*')
+      .eq('user_id', userId)
+      .not('result', 'is', null) // Apenas trades finalizados
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    
+    console.log(`📊 ${data?.length || 0} trades históricos carregados para análise`);
+    return data || [];
+  }
+
+  // 🆕 Analisar performance por padrão (aprendizado)
+  async analyzePatternPerformance(trades: any[]): Promise<Map<string, { wins: number; total: number; winRate: number; avgPnL: number }>> {
+    const patternStats = new Map<string, { wins: number; total: number; winRate: number; avgPnL: number }>();
+    
+    for (const trade of trades) {
+      if (!trade.technical_context) continue;
+      
+      try {
+        const context = typeof trade.technical_context === 'string' 
+          ? JSON.parse(trade.technical_context) 
+          : trade.technical_context;
+        
+        const patternName = context.patterns?.patternName;
+        if (!patternName) continue;
+        
+        const current = patternStats.get(patternName) || { wins: 0, total: 0, winRate: 0, avgPnL: 0 };
+        current.total++;
+        if (trade.result === 'WIN') current.wins++;
+        current.winRate = (current.wins / current.total) * 100;
+        
+        // Calcular PnL médio
+        const pnl = trade.pnl || 0;
+        current.avgPnL = ((current.avgPnL * (current.total - 1)) + pnl) / current.total;
+        
+        patternStats.set(patternName, current);
+        
+        // 🎓 APLICAR APRENDIZADO ao learningModel
+        this.learningModel.set(patternName, current.winRate);
+        
+      } catch (e) {
+        console.error('Erro ao processar trade:', e);
+      }
+    }
+    
+    console.log('🎓 Pattern stats:', Object.fromEntries(patternStats));
+    return patternStats;
+  }
+
   // Extrai símbolo do texto (suporte básico)
   extractSymbolFromMessage(message: string): string | null {
     const msg = message.toLowerCase();
@@ -454,6 +506,22 @@ class TradeVisionAI {
     const knowledge = await this.findRelevantKnowledge(message);
     const analyses = await this.findSimilarAnalysis(message);
     const signals = await this.getRecentNarratorSignals(userId);
+    
+    // 🆕 3.5. BUSCAR HISTÓRICO DE TRADES PARA APRENDIZADO
+    const tradeHistory = await this.getRecentTrades(userId, 20);
+    
+    // 🆕 3.6. ANALISAR PERFORMANCE DOS PADRÕES (AUTO-APRENDIZADO)
+    if (tradeHistory.length > 0) {
+      const patternPerformance = await this.analyzePatternPerformance(tradeHistory);
+      
+      // Aplicar aprendizado: Padrões com win rate alto ganham boost
+      patternPerformance.forEach((stats, patternName) => {
+        const winRateBoost = (stats.winRate - 50) * 0.2; // -10 a +10 pontos
+        this.learningModel.set(patternName, stats.winRate);
+        
+        console.log(`🎓 ${patternName}: ${stats.wins}/${stats.total} (${stats.winRate.toFixed(1)}%) → Boost: ${winRateBoost.toFixed(1)}`);
+      });
+    }
     
     // 4. APLICAR APRENDIZADO
     knowledge.forEach((k: any) => {

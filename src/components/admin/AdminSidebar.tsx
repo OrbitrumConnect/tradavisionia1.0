@@ -9,7 +9,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { LayoutDashboard, MessageSquare, Brain, BarChart3, LogOut, Wrench, Home, Bot } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, Brain, BarChart3, LogOut, Wrench, Home, Bot, TrendingUp } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
@@ -17,7 +17,7 @@ import { SimpleChatFlow } from './SimpleChatFlow';
 
 interface AdminSidebarProps {
   activeView: string;
-  setActiveView: (view: 'dashboard' | 'chat' | 'knowledge' | 'analytics' | 'builder' | 'chatflow' | 'learning') => void;
+  setActiveView: (view: 'dashboard' | 'chat' | 'knowledge' | 'analytics' | 'builder' | 'chatflow' | 'learning' | 'ai-trading') => void;
   selectedSymbol?: string;
 }
 
@@ -31,6 +31,7 @@ export function AdminSidebar({ activeView, setActiveView, selectedSymbol = 'BTC/
   const menuItems = [
     { id: 'dashboard', title: 'Dashboard', icon: LayoutDashboard },
     { id: 'chat', title: 'Agente TradeVision', icon: MessageSquare },
+    { id: 'ai-trading', title: 'Gráfico x IA (Paper Trading)', icon: TrendingUp }, // 🆕
     { id: 'knowledge', title: 'Base de Conhecimento', icon: Brain },
     { id: 'analytics', title: 'Analytics', icon: BarChart3 },
     { id: 'builder', title: 'IA Builder', icon: Wrench },

@@ -14,6 +14,7 @@ import { AdminAnalytics } from '@/components/admin/AdminAnalytics';
 import { AdminBuilder } from '@/components/admin/AdminBuilder';
 import { ChatFlowView } from '@/components/admin/ChatFlowView';
 import { RealLearningSystem } from '@/components/admin/RealLearningSystem';
+import { AITrading } from '@/components/admin/AITrading'; // 🆕 GRÁFICO X IA
 import { Loader2 } from 'lucide-react';
 
 const Admin = () => {
@@ -21,7 +22,7 @@ const Admin = () => {
   const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [activeView, setActiveView] = useState<'dashboard' | 'chat' | 'knowledge' | 'analytics' | 'builder' | 'chatflow' | 'learning'>('dashboard');
+  const [activeView, setActiveView] = useState<'dashboard' | 'chat' | 'knowledge' | 'analytics' | 'builder' | 'chatflow' | 'learning' | 'ai-trading'>('dashboard');
   const [isChatsSidebarOpen, setIsChatsSidebarOpen] = useState(false);
   const [selectedSymbol, setSelectedSymbol] = useState('BTC/USDT');
 
@@ -102,6 +103,7 @@ const Admin = () => {
             {activeView === 'builder' && <AdminBuilder />}
             {activeView === 'chatflow' && <ChatFlowView symbol={selectedSymbol} />}
             {activeView === 'learning' && <RealLearningSystem />}
+            {activeView === 'ai-trading' && <AITrading symbol={selectedSymbol} />}
           </main>
         </div>
       </div>
